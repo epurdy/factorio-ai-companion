@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "factorio-companion": {
+      "command": "bun",
+      "args": ["run", "src/index.ts"],
+      "env": {
+        "FACTORIO_HOST": "127.0.0.1",
+        "FACTORIO_RCON_PORT": "27000",
+        "FACTORIO_RCON_PASSWORD": "factorio"
+      }
+    }
+  }
+}
