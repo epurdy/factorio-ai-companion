@@ -4,7 +4,7 @@ Bidirectional chat bridge between Factorio and Claude Code via MCP protocol.
 
 ## Status: ✅ Phase 1 Complete - Chat Bridge Working!
 
-Chat bidirectional funcionando entre Factorio y Claude Code.
+Bidirectional chat working between Factorio and Claude Code via RCON.
 
 ## Quick Start Guide
 
@@ -23,27 +23,31 @@ xcopy /E /I factorio-mod "%APPDATA%\Factorio\mods\ai-companion"
 
 **Linux/Mac:** See `factorio-mod/README.md`
 
-### 3. Start Factorio with RCON
+### 3. Configure RCON in Factorio
 
-**Option A: Command Line (Recommended - works reliably)**
+Edit `%APPDATA%\Factorio\config\config.ini` and set:
 
-```bash
-"C:/Program Files (x86)/Steam/steamapps/common/Factorio/bin/x64/factorio.exe" --rcon-port 34198 --rcon-password factorio
+```ini
+local-rcon-socket=127.0.0.1:34198
+local-rcon-password=factorio
 ```
 
-This opens Factorio with RCON enabled. Then:
-1. Load any save or create new game
-2. Host as multiplayer server (required for RCON)
-3. Test connection (see step 4)
+**Or use the hidden settings GUI:**
+1. In Factorio main menu, press **Ctrl+Alt** and click **Settings**
+2. Go to **"The rest"** tab
+3. Set `local-rcon-socket` to `127.0.0.1:34198`
+4. Set `local-rcon-password` to `factorio`
 
-**Option B: GUI Configuration (May not work in all cases)**
+### 4. Start Factorio Multiplayer
+
+**Important:** RCON only works in multiplayer mode (even if playing solo).
 
 1. Launch Factorio
-2. **Main Menu → Multiplayer → Host New Game**
-3. Load your save
-4. The RCON port will be automatically assigned (check Settings → Network)
+2. **Multiplayer** → **Host New Game** (or **Load Game**)
+3. Select your save and click **Play**
+4. RCON will be automatically enabled
 
-### 4. Test RCON Connection (Optional)
+### 5. Test RCON Connection (Optional)
 
 ```bash
 bun run src/rcon/test-connection.ts
@@ -56,7 +60,7 @@ Expected output:
 ✅ RCON is working!
 ```
 
-### 5. Start MCP Server
+### 6. Start MCP Server
 
 ```bash
 bun run src/index.ts
@@ -74,13 +78,13 @@ Expected output:
    - send_companion_message
 ```
 
-### 6. Connect Claude Code
+### 7. Connect Claude Code
 
 The `.mcp.json` file in this project root configures Claude Code to use this server.
 
 Claude Code will automatically start the MCP server when needed.
 
-### 7. Test It!
+### 8. Test It!
 
 **In Factorio chat:**
 ```
