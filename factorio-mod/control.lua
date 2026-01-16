@@ -7,15 +7,15 @@
 
 -- Initialize global state on new game
 script.on_init(function()
-  global.companion_messages = {}
-  global.companion_tick_counter = 0
+  storage.companion_messages = {}
+  storage.companion_tick_counter = 0
   game.print("[AI Companion] Mod initialized! Type /companion <message> to chat with Claude", {r=0.5, g=0.8, b=1})
 end)
 
 -- Handle mod updates
 script.on_configuration_changed(function()
-  global.companion_messages = global.companion_messages or {}
-  global.companion_tick_counter = global.companion_tick_counter or 0
+  storage.companion_messages = storage.companion_messages or {}
+  storage.companion_tick_counter = storage.companion_tick_counter or 0
   game.print("[AI Companion] Mod updated!", {r=0.5, g=0.8, b=1})
 end)
 
@@ -33,7 +33,7 @@ script.on_event(defines.events.on_console_chat, function(event)
     -- Check if message starts with /companion
     local content = message:match("^/companion%s+(.+)$")
     if content then
-      table.insert(global.companion_messages, {
+      table.insert(storage.companion_messages, {
         player = player.name,
         message = content,
         tick = game.tick,
@@ -55,7 +55,7 @@ commands.add_command("companion_get_messages", "Get unread companion messages", 
   local success, result = pcall(function()
     local messages = {}
 
-    for i, msg in ipairs(global.companion_messages) do
+    for i, msg in ipairs(storage.companion_messages) do
       if not msg.read then
         table.insert(messages, {
           player = msg.player,
@@ -102,10 +102,10 @@ commands.add_command("companion_cleanup", "Cleanup old messages", function(comma
     local removed_count = 0
 
     -- Remove from end to avoid index shifting issues
-    for i = #global.companion_messages, 1, -1 do
-      local msg = global.companion_messages[i]
+    for i = #storage.companion_messages, 1, -1 do
+      local msg = storage.companion_messages[i]
       if (current_tick - msg.tick) > cutoff_ticks then
-        table.remove(global.companion_messages, i)
+        table.remove(storage.companion_messages, i)
         removed_count = removed_count + 1
       end
     end
