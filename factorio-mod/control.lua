@@ -5,24 +5,17 @@
 -- - Safe JSON serialization
 -- - Configuration change handling
 
--- Initialize global state
-local function init_globals()
-  global.companion_messages = global.companion_messages or {}
-  global.companion_tick_counter = global.companion_tick_counter or 0
-end
-
+-- Initialize global state on new game
 script.on_init(function()
-  init_globals()
+  global.companion_messages = {}
+  global.companion_tick_counter = 0
   game.print("[AI Companion] Mod initialized! Type /companion <message> to chat with Claude", {r=0.5, g=0.8, b=1})
 end)
 
-script.on_load(function()
-  init_globals()
-end)
-
--- Handle mod configuration changes (FLE pattern)
+-- Handle mod updates
 script.on_configuration_changed(function()
-  init_globals()
+  global.companion_messages = global.companion_messages or {}
+  global.companion_tick_counter = global.companion_tick_counter or 0
   game.print("[AI Companion] Mod updated!", {r=0.5, g=0.8, b=1})
 end)
 

@@ -4,6 +4,6 @@
   "title": "AI Companion",
   "author": "lveil",
   "factorio_version": "2.0",
-  "description": "Enables Claude Code to interact via chat and control a character. Compatible with Factorio 2.x and 1.1+",
-  "dependencies": ["base >= 1.1"]
+  "description": "Enables Claude Code to interact via chat. For Factorio 2.x",
+  "dependencies": ["base >= 2.0"]
 }
