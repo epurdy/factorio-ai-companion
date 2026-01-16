@@ -19,29 +19,38 @@ script.on_configuration_changed(function()
   game.print("[AI Companion] Mod updated!", {r=0.5, g=0.8, b=1})
 end)
 
--- Chat event handler with error handling
-script.on_event(defines.events.on_console_chat, function(event)
-  -- Wrap in pcall for safety (FLE pattern)
+-- Register /companion command
+commands.add_command("companion", "Send a message to Claude AI", function(command)
   local success, error_msg = pcall(function()
-    local player = game.players[event.player_index]
-    if not player or not player.valid then
+    local player
+    if command.player_index then
+      player = game.players[command.player_index]
+      if not player or not player.valid then
+        return
+      end
+    end
+
+    local message = command.parameter
+    if not message or message == "" then
+      if player then
+        player.print("[AI Companion] Usage: /companion <message>", {r=1, g=0.5, b=0})
+      end
       return
     end
 
-    local message = event.message
+    -- Store the message
+    table.insert(storage.companion_messages, {
+      player = player and player.name or "server",
+      message = message,
+      tick = game.tick,
+      read = false
+    })
 
-    -- Check if message starts with /companion
-    local content = message:match("^/companion%s+(.+)$")
-    if content then
-      table.insert(storage.companion_messages, {
-        player = player.name,
-        message = content,
-        tick = game.tick,
-        read = false
-      })
-
-      -- Acknowledge in chat
-      player.print("[AI Companion] Message received: " .. content, {r=0.5, g=0.8, b=1})
+    -- Acknowledge in chat
+    if player then
+      player.print("[AI Companion] Message received: " .. message, {r=0.5, g=0.8, b=1})
+    else
+      game.print("[AI Companion] Message received: " .. message, {r=0.5, g=0.8, b=1})
     end
   end)
 
