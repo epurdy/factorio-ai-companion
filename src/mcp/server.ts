@@ -10,6 +10,7 @@ import { SendMessageSchema } from "./tools";
 export class FactorioMCPServer {
   private server: Server;
   private rcon: RCONClient;
+  private pollingInterval?: NodeJS.Timeout;
 
   constructor(rconConfig: { host: string; port: number; password: string }) {
     this.server = new Server(
@@ -120,6 +121,46 @@ export class FactorioMCPServer {
     });
   }
 
+  private async checkForMessages() {
+    try {
+      const response = await this.rcon.sendCommand("/companion_get_messages");
+
+      if (response.success && response.data) {
+        const messages = JSON.parse(response.data || "[]");
+
+        if (Array.isArray(messages) && messages.length > 0) {
+          // Send notification to client about new messages
+          messages.forEach((msg: any) => {
+            this.server.notification({
+              method: "notifications/message",
+              params: {
+                level: "info",
+                logger: "factorio-companion",
+                data: {
+                  player: msg.player,
+                  message: msg.message,
+                  tick: msg.tick,
+                },
+              },
+            });
+          });
+
+          console.error(`📬 Sent ${messages.length} message notification(s)`);
+        }
+      }
+    } catch (error) {
+      // Silently ignore polling errors
+    }
+  }
+
+  private startPolling() {
+    console.error("🔄 Starting message polling (every 3 seconds)...");
+
+    this.pollingInterval = setInterval(async () => {
+      await this.checkForMessages();
+    }, 3000);
+  }
+
   async start() {
     console.error("🚀 Starting Factorio MCP Server...");
     await this.rcon.connect();
@@ -131,5 +172,15 @@ export class FactorioMCPServer {
     console.error("\n💡 Server is ready! Claude Code can now use:");
     console.error("   - get_companion_messages");
     console.error("   - send_companion_message\n");
+
+    // Start polling for messages
+    this.startPolling();
+  }
+
+  async stop() {
+    if (this.pollingInterval) {
+      clearInterval(this.pollingInterval);
+    }
+    await this.rcon.disconnect();
   }
 }

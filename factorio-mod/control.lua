@@ -19,8 +19,8 @@ script.on_configuration_changed(function()
   game.print("[AI Companion] Mod updated!", {r=0.5, g=0.8, b=1})
 end)
 
--- Register /companion command
-commands.add_command("companion", "Send a message to Claude AI", function(command)
+-- Helper function for companion command
+local function handle_companion_command(command)
   local success, error_msg = pcall(function()
     local player
     if command.player_index then
@@ -33,7 +33,7 @@ commands.add_command("companion", "Send a message to Claude AI", function(comman
     local message = command.parameter
     if not message or message == "" then
       if player then
-        player.print("[AI Companion] Usage: /companion <message>", {r=1, g=0.5, b=0})
+        player.print("[AI Companion] Usage: /companion <message> or /fac <message>", {r=1, g=0.5, b=0})
       end
       return
     end
@@ -57,6 +57,16 @@ commands.add_command("companion", "Send a message to Claude AI", function(comman
   if not success then
     game.print("[AI Companion] Error processing message: " .. tostring(error_msg), {r=1, g=0, b=0})
   end
+end
+
+-- Register /companion command
+commands.add_command("companion", "Send a message to Claude AI", function(command)
+  handle_companion_command(command)
+end)
+
+-- Register /fac command (alias)
+commands.add_command("fac", "Send a message to Claude AI (short for /companion)", function(command)
+  handle_companion_command(command)
 end)
 
 -- RCON command to get pending messages with safe JSON serialization
