@@ -76,7 +76,7 @@ commands.add_command("companion_get_messages", "Get unread companion messages", 
     end
 
     -- Safe JSON conversion (FLE pattern)
-    local json_success, json_result = pcall(game.table_to_json, messages)
+    local json_success, json_result = pcall(helpers.table_to_json, messages)
     if json_success then
       rcon.print(json_result)
     else

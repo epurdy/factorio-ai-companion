@@ -25,13 +25,23 @@ xcopy /E /I factorio-mod "%APPDATA%\Factorio\mods\ai-companion"
 
 ### 3. Start Factorio with RCON
 
+**Option A: Command Line (Recommended - works reliably)**
+
+```bash
+"C:/Program Files (x86)/Steam/steamapps/common/Factorio/bin/x64/factorio.exe" --rcon-port 34198 --rcon-password factorio
+```
+
+This opens Factorio with RCON enabled. Then:
+1. Load any save or create new game
+2. Host as multiplayer server (required for RCON)
+3. Test connection (see step 4)
+
+**Option B: GUI Configuration (May not work in all cases)**
+
 1. Launch Factorio
-2. **Main Menu → New Game**
-3. ✅ **Check "Start as server"** (critical!)
-4. **Settings → Network:**
-   - RCON Port: `27000`
-   - RCON Password: `factorio`
-5. **Play!**
+2. **Main Menu → Multiplayer → Host New Game**
+3. Load your save
+4. The RCON port will be automatically assigned (check Settings → Network)
 
 ### 4. Test RCON Connection (Optional)
 
