@@ -70,7 +70,8 @@ local-rcon-password=factorio
 
 **Update mod:**
 ```bash
-xcopy /E /Y "factorio-mod\*" "%APPDATA%\Factorio\mods\ai-companion\"
+# Windows command (use this, xcopy has path issues in bash)
+cp -r /c/Users/lveil/Desktop/Projects/factorio-ai-companion/factorio-mod/* /c/Users/lveil/AppData/Roaming/Factorio/mods/ai-companion/
 ```
 Restart Factorio.
 
