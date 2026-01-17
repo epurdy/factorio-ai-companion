@@ -77,92 +77,9 @@ commands.add_command("fac_resource_mine_stop", nil, function(cmd)
   if not ok then u.error_response(err) end
 end)
 
--- Realistic mining using entity.mining_state (native Factorio mining)
--- Usage: /fac_resource_mine_real <id> <x> <y>
-commands.add_command("fac_resource_mine_real", nil, function(cmd)
-  local ok, err = pcall(function()
-    local args = u.parse_args("^(%S+)%s+(%-?%d+%.?%d*)%s+(%-?%d+%.?%d*)$", cmd.parameter)
-    local id, c = u.find_companion(args[1])
-    if not id then u.error_response("Companion not found"); return end
-    local x, y = tonumber(args[2]), tonumber(args[3])
-    if not x or not y then u.error_response("Invalid coordinates"); return end
-
-    local target = {x = x, y = y}
-    local dist = u.distance(c.entity.position, target)
-    if dist > 5 then u.json_response({id = id, error = "Too far (" .. math.floor(dist) .. " tiles)"}); return end
-
-    -- Find resource entity at target position
-    local resources = c.entity.surface.find_entities_filtered{position = target, radius = 2, type = "resource"}
-    if #resources == 0 then u.json_response({id = id, error = "No resource at target"}); return end
-
-    -- Set native mining state (FLE-style)
-    c.entity.update_selected_entity(target)
-    c.entity.mining_state = {mining = true, position = target}
-
-    -- Store for tracking
-    storage.realistic_mining = storage.realistic_mining or {}
-    storage.realistic_mining[id] = {
-      target = target,
-      start_tick = game.tick,
-      start_inventory = c.entity.get_inventory(defines.inventory.character_main).get_item_count()
-    }
-
-    u.json_response({id = id, mining_real = true, target = target, status = "started"})
-  end)
-  if not ok then u.error_response(err) end
-end)
-
--- Check realistic mining status
-commands.add_command("fac_resource_mine_real_status", nil, function(cmd)
-  local ok, err = pcall(function()
-    local args = u.parse_args("^(%S+)$", cmd.parameter)
-    local id, c = u.find_companion(args[1])
-    if not id then u.error_response("Companion not found"); return end
-
-    storage.realistic_mining = storage.realistic_mining or {}
-    local mining = storage.realistic_mining[id]
-    if not mining then
-      u.json_response({id = id, active = false})
-      return
-    end
-
-    local current_inventory = c.entity.get_inventory(defines.inventory.character_main).get_item_count()
-    local harvested = current_inventory - mining.start_inventory
-    local is_mining = c.entity.mining_state and c.entity.mining_state.mining
-
-    u.json_response({
-      id = id,
-      active = is_mining,
-      harvested = harvested,
-      ticks = game.tick - mining.start_tick,
-      target = mining.target
-    })
-  end)
-  if not ok then u.error_response(err) end
-end)
-
--- Stop realistic mining
-commands.add_command("fac_resource_mine_real_stop", nil, function(cmd)
-  local ok, err = pcall(function()
-    local args = u.parse_args("^(%S+)$", cmd.parameter)
-    local id, c = u.find_companion(args[1])
-    if not id then u.error_response("Companion not found"); return end
-
-    c.entity.mining_state = {mining = false}
-
-    storage.realistic_mining = storage.realistic_mining or {}
-    local mining = storage.realistic_mining[id]
-    local harvested = 0
-    if mining then
-      local current = c.entity.get_inventory(defines.inventory.character_main).get_item_count()
-      harvested = current - mining.start_inventory
-      storage.realistic_mining[id] = nil
-    end
-
-    u.json_response({id = id, stopped = true, harvested = harvested})
-  end)
-  if not ok then u.error_response(err) end
-end)
+-- NOTE: mine_real commands removed in v0.11.0
+-- The hybrid system in queues.lua now provides native mining automatically
+-- Use /fac_resource_mine instead - it uses mining_state with auto-restart
 
 commands.add_command("fac_resource_nearest", nil, function(cmd)
   local ok, err = pcall(function()

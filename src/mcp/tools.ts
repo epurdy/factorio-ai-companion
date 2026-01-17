@@ -117,29 +117,11 @@ export const TOOLS: Record<string, {
     params: { companionId: { type: "number", required: true } }
   },
   resource_mine_stop: {
-    desc: "Stop mining queue",
+    desc: "Stop mining queue (v0.11.0+: uses hybrid native mining)",
     rcon: "/fac_resource_mine_stop {companionId}",
     params: { companionId: { type: "number", required: true } }
   },
-  resource_mine_real: {
-    desc: "Start native Factorio mining (uses entity.mining_state)",
-    rcon: "/fac_resource_mine_real {companionId} {x} {y}",
-    params: {
-      companionId: { type: "number", required: true },
-      x: { type: "number", required: true },
-      y: { type: "number", required: true }
-    }
-  },
-  resource_mine_real_status: {
-    desc: "Check native mining status",
-    rcon: "/fac_resource_mine_real_status {companionId}",
-    params: { companionId: { type: "number", required: true } }
-  },
-  resource_mine_real_stop: {
-    desc: "Stop native mining",
-    rcon: "/fac_resource_mine_real_stop {companionId}",
-    params: { companionId: { type: "number", required: true } }
-  },
+  // NOTE: mine_real_* removed in v0.11.0 - resource_mine now uses hybrid native mining
 
   // Items
   item_pick: {

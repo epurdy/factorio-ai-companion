@@ -1,10 +1,10 @@
 {
   "name": "ai-companion",
-  "version": "0.10.1",
+  "version": "0.12.0",
   "title": "AI Companion",
   "author": "lveillard",
   "contact": "lvei.goes553@aleeas.com",
   "factorio_version": "2.0",
-  "description": "AI companions with 50 RCON commands. Map markers for companions. FLE-inspired tick-based queues. Factorio 2.x compatible.",
+  "description": "AI companions with 51 RCON commands. Hybrid mining (native + auto-restart). Map markers. FLE-inspired queues. Factorio 2.x compatible.",
   "dependencies": ["base >= 2.0"]
 }

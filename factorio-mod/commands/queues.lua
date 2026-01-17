@@ -101,53 +101,57 @@ end
 
 function M.tick_harvest_queues()
   process_queue("harvest_queues", function(cid, q, c)
+    -- Target reached
     if q.harvested >= q.target then
       c.entity.mining_state = {mining = false}
       return true
     end
 
+    -- Too far from mining area
     if u.distance(c.entity.position, q.position) > MINING_RANGE then
       c.entity.mining_state = {mining = false}
       return true
     end
 
+    -- Start mining first resource
     if not q.current then
       if not M.start_mining_next(cid) then
         c.entity.mining_state = {mining = false}
         return true
       end
+      q.inv_snapshot = c.entity.get_main_inventory().get_contents()
       return false
     end
 
     local current = q.current
-    if not current.entity or not current.entity.valid then
-      q.current = nil
-      M.start_mining_next(cid)
-      return false
-    end
 
-    local elapsed = game.tick - current.start_tick
-    if elapsed >= math.max(MIN_ACTION_TICKS, current.mining_time) then
-      local inv_before = c.entity.get_main_inventory().get_contents()
-      local mined = c.entity.mine_entity(current.entity, true)
-
-      if mined then
-        local inv_after = c.entity.get_main_inventory().get_contents()
-        local added = 0
-        for name, data in pairs(inv_after) do
-          local before = inv_before[name] and inv_before[name].count or 0
-          added = added + (data.count - before)
-        end
-        q.harvested = q.harvested + math.max(1, added)
+    -- HYBRID: Let Factorio mine natively, monitor mining_state
+    -- When mining stops (entity depleted or finished), count inventory and move to next
+    if not c.entity.mining_state or not c.entity.mining_state.mining then
+      -- Mining stopped - count what we got
+      local inv_after = c.entity.get_main_inventory().get_contents()
+      local added = 0
+      for name, data in pairs(inv_after) do
+        local before = q.inv_snapshot[name] and q.inv_snapshot[name].count or 0
+        added = added + (data.count - before)
       end
+      q.harvested = q.harvested + added
 
-      q.current = nil
+      -- Check if target reached
       if q.harvested >= q.target then
         c.entity.mining_state = {mining = false}
         return true
       end
-      M.start_mining_next(cid)
+
+      -- Move to next resource
+      q.current = nil
+      if not M.start_mining_next(cid) then
+        c.entity.mining_state = {mining = false}
+        return true
+      end
+      q.inv_snapshot = c.entity.get_main_inventory().get_contents()
     end
+
     return false
   end)
 end
