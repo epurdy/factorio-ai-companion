@@ -2,49 +2,52 @@
 
 Bridge between Factorio game and Claude Code via RCON + MCP.
 
-## Architecture Overview
+## IMPORTANT: FLE Reference
+
+**DO NOT clone FLE into this repo.** It lives separately at:
+```
+../factorio-learning-environment/
+```
+
+When implementing new features, ALWAYS check FLE first:
+- Tools: `../factorio-learning-environment/fle/env/tools/agent/`
+- Entity utils: `../factorio-learning-environment/fle/env/src/`
+
+## Architecture
 
 ```
-Factorio (Lua mod) <--RCON--> TypeScript Server <--MCP--> Claude Code
+Factorio (Lua mod) <--RCON--> TypeScript <--MCP--> Claude Code
 ```
 
-**Communication flow:**
 1. Player writes `/fac <message>` in Factorio
-2. Lua mod stores message in `storage.companion_messages[]`
-3. TypeScript polls RCON with `/companion_get_messages`
+2. Lua stores in `storage.companion_messages[]`
+3. TypeScript polls RCON `/companion_get_messages`
 4. Claude processes and responds via `/companion_send`
-5. Message appears in Factorio chat with color coding
 
-**Color coding:**
-- `[${USERNAME}]` in cyan/blue - player messages
-- `[Claude]` in bright green - AI responses
+**Colors:** `[username]` cyan, `[Claude]` green
 
 ## Project Structure
 
 ```
-factorio-ai-companion/
+factorio-ai-companion/          # THIS REPO
 ├── src/
-│   ├── rcon/
-│   │   ├── client.ts       # RCON client (ported from FLE patterns)
-│   │   └── types.ts        # TypeScript types
-│   ├── mcp/
-│   │   ├── server.ts       # MCP server with tools (stdio mode)
-│   │   └── tools.ts        # Tool schemas
-│   ├── daemon.ts           # Continuous polling daemon (not used currently)
-│   ├── reactive.ts         # One-shot message waiter (ACTIVE)
-│   ├── monitor.ts          # Simple test script
-│   └── index.ts            # MCP entry point
-├── .mcp.json               # Claude Code MCP configuration
-├── claude.md               # This file
+│   ├── rcon/client.ts          # RCON client
+│   ├── rcon/types.ts
+│   ├── mcp/server.ts           # MCP server (stdio)
+│   ├── mcp/tools.ts
+│   ├── reactive.ts             # One-shot message waiter (ACTIVE)
+│   ├── daemon.ts               # Continuous polling (alternative)
+│   └── index.ts                # MCP entry point
+├── .mcp.json
+├── claude.md                   # THIS FILE - read first!
 └── package.json
 
-Factorio mod location:
-%APPDATA%/Factorio/mods/ai-companion/
-├── info.json               # Version 0.2.0
-└── control.lua             # Lua commands
+%APPDATA%/Factorio/mods/ai-companion/   # FACTORIO MOD
+├── info.json                   # Version 0.2.1
+└── control.lua
 
-Reference implementation:
-../factorio-learning-environment/   # FLE source code for patterns
+../factorio-learning-environment/       # FLE REFERENCE (separate repo)
+└── fle/env/tools/agent/        # Look here for Lua patterns
 ```
 
 ## Factorio Setup
@@ -266,7 +269,8 @@ Defined in `.mcp.json` and used by `src/rcon/client.ts`.
 
 ## Version History
 
-- **0.2.0** - Complete documentation, FLE reference integration, reactive loop guide
+- **0.2.1** - Codebase cleanup, remove unused files and AI slop
+- **0.2.0** - Complete documentation, reactive loop guide
 - **0.1.7** - Chat color differentiation ([user] cyan, [Claude] green)
 - **0.1.6** - Added `/fac` alias
 - **0.1.5** - Fixed JSON serialization (helpers.table_to_json)
