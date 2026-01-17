@@ -57,6 +57,11 @@ export const TOOLS: Record<string, {
     rcon: "/fac_companion_disappear {companionId}",
     params: { companionId: { type: "number", required: true } }
   },
+  companion_stop_all: {
+    desc: "Stop all queues for a companion (harvest, craft, build, combat, walk)",
+    rcon: "/fac_companion_stop_all {companionId}",
+    params: { companionId: { type: "number", required: true } }
+  },
 
   // Movement
   move_to: {
@@ -422,6 +427,15 @@ export const SKILLS: Record<string, {
       companionId: { type: "number", required: true },
       resource: { type: "string", desc: "Resource: iron, copper, coal, stone, uranium", required: true },
       amount: { type: "number", desc: "Target amount", default: 50 }
+    }
+  },
+  combat_until: {
+    desc: "HIGH-LEVEL: Autonomously hunt and kill enemies. Handles scanning, walking, attacking. Runs in background.",
+    script: "skills/combat-until.ts",
+    params: {
+      companionId: { type: "number", required: true },
+      targetType: { type: "string", desc: "Target: all, spawner, worm, biter, spitter", default: "all" },
+      maxKills: { type: "number", desc: "Max kills before stopping", default: 10 }
     }
   },
 };

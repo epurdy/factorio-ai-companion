@@ -1,4 +1,13 @@
 ---------------------------------------------------------------------------------------------------
+Version: 0.13.1
+Date: 2025-01-17
+  Features:
+    - Added fac_companion_stop_all command to clear all queues
+    - Added combat_until skill for autonomous hunting
+  Changes:
+    - Combat skill handles scan, move, attack cycle
+    - Companion stop_all clears harvest, craft, build, combat, walk queues
+---------------------------------------------------------------------------------------------------
 Version: 0.13.0
 Date: 2025-01-17
   Features:

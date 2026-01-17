@@ -7,10 +7,11 @@ commands.add_command("fac_companion_list", nil, function(cmd)
     for id, c in pairs(storage.companions) do
       if c.entity and c.entity.valid then
         local pos = c.entity.position
+        local max_h = c.entity.max_health or (c.entity.prototype and c.entity.prototype.max_health) or 100
         list[#list + 1] = {
           id = id,
           position = {x = math.floor(pos.x * 10) / 10, y = math.floor(pos.y * 10) / 10},
-          health = math.floor(c.entity.health / c.entity.prototype.max_health * 100),
+          health = math.floor(c.entity.health / max_h * 100),
           name = c.name
         }
       end
@@ -141,5 +142,35 @@ commands.add_command("fac_companion_inventory", nil, function(cmd)
       table.sort(items, function(a, b) return a.count > b.count end)
       u.json_response({id = id, items = items, slots = #inv, used = #items})
     end
+  end)
+end)
+
+commands.add_command("fac_companion_stop_all", nil, function(cmd)
+  u.safe_command(function()
+    local id, c = u.find_companion(cmd.parameter)
+    if not id then u.error_response("Companion not found"); return end
+    local stopped = {}
+    if storage.harvest_queues and storage.harvest_queues[id] then
+      storage.harvest_queues[id] = nil
+      stopped[#stopped + 1] = "harvest"
+    end
+    if storage.craft_queues and storage.craft_queues[id] then
+      storage.craft_queues[id] = nil
+      stopped[#stopped + 1] = "craft"
+    end
+    if storage.build_queues and storage.build_queues[id] then
+      storage.build_queues[id] = nil
+      stopped[#stopped + 1] = "build"
+    end
+    if storage.combat_queues and storage.combat_queues[id] then
+      storage.combat_queues[id] = nil
+      stopped[#stopped + 1] = "combat"
+    end
+    if storage.walking_queues and storage.walking_queues[id] then
+      storage.walking_queues[id] = nil
+      stopped[#stopped + 1] = "walk"
+    end
+    c.entity.walking_state = {walking = false}
+    u.json_response({id = id, stopped = stopped})
   end)
 end)

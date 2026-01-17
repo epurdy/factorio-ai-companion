@@ -25,7 +25,7 @@ export class FactorioMCPServer {
     this.server = new Server(
       {
         name: "factorio-companion",
-        version: "0.13.0",
+        version: "0.13.1",
       },
       {
         capabilities: {
