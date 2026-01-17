@@ -26,19 +26,26 @@ commands.add_command("fac_resource_list", nil, function(cmd)
 end)
 
 -- Realistic mining using tick-based queue system
+-- Usage: /fac_resource_mine <id> <x> <y> [count] [resource_name]
+-- resource_name is optional - if provided, only mines that specific resource type
 commands.add_command("fac_resource_mine", nil, function(cmd)
   local ok, err = pcall(function()
-    local args = u.parse_args("^(%S+)%s+(%-?%d+%.?%d*)%s+(%-?%d+%.?%d*)%s*(%d*)$", cmd.parameter)
+    local args = u.parse_args("^(%S+)%s+(%-?%d+%.?%d*)%s+(%-?%d+%.?%d*)%s*(%d*)%s*(%S*)$", cmd.parameter)
     local id, c = u.find_companion(args[1])
     if not id then u.error_response("Companion not found"); return end
     local x, y, count = tonumber(args[2]), tonumber(args[3]), tonumber(args[4]) or 1
+    local resource_name = args[5] ~= "" and args[5] or nil
+    -- Normalize common resource names
+    if resource_name then
+      resource_name = normalize[resource_name] or resource_name
+    end
     if not x or not y then u.error_response("Invalid coordinates"); return end
     local tpos = {x = x, y = y}
     if u.distance(c.entity.position, tpos) > 5 then u.json_response({id = id, error = "Too far"}); return end
-    -- Start realistic mining via queue system
-    local result = queues.start_harvest(id, tpos, count)
+    -- Start realistic mining via queue system (with optional resource filter)
+    local result = queues.start_harvest(id, tpos, count, resource_name)
     if result then
-      u.json_response({id = id, mining = true, target = count, entities = result.entities or 0, status = "started"})
+      u.json_response({id = id, mining = true, target = count, entities = result.entities or 0, resource = resource_name, status = "started"})
     else
       u.json_response({id = id, error = "Failed to start mining"})
     end

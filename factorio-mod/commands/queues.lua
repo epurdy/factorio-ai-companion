@@ -45,13 +45,15 @@ end
 
 -- ============ HARVEST ============
 
-function M.start_harvest(cid, position, target_count)
+function M.start_harvest(cid, position, target_count, resource_name)
   local c = valid_companion(cid)
   if not c then return {error = "Invalid companion"} end
 
-  local entities = c.entity.surface.find_entities_filtered{
-    position = position, radius = 3, type = "resource"
-  }
+  -- Filter by resource name if specified, otherwise get all resources
+  local filter = {position = position, radius = 3, type = "resource"}
+  if resource_name then filter.name = resource_name end
+
+  local entities = c.entity.surface.find_entities_filtered(filter)
   if #entities == 0 then return {error = "No resource"} end
 
   table.sort(entities, function(a, b)
@@ -63,11 +65,12 @@ function M.start_harvest(cid, position, target_count)
     position = position,
     target = target_count,
     harvested = 0,
-    current = nil
+    current = nil,
+    resource_name = resource_name
   }
 
   M.start_mining_next(cid)
-  return {started = true, entities = #entities, target = target_count}
+  return {started = true, entities = #entities, target = target_count, resource = resource_name}
 end
 
 function M.start_mining_next(cid)

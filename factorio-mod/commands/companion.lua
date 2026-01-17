@@ -115,7 +115,10 @@ commands.add_command("fac_companion_inventory", nil, function(cmd)
     else
       local inv = c.entity.get_inventory(defines.inventory.character_main)
       local items = {}
-      for name, count in pairs(inv.get_contents()) do items[#items + 1] = {name = name, count = count} end
+      -- Factorio 2.0: get_contents() returns {name, quality, count} items
+      for _, item in pairs(inv.get_contents()) do
+        items[#items + 1] = {name = item.name, count = item.count, quality = item.quality}
+      end
       table.sort(items, function(a, b) return a.count > b.count end)
       u.json_response({id = id, items = items, slots = #inv, used = #items})
     end

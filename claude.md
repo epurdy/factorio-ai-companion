@@ -17,141 +17,188 @@ When implementing new features, ALWAYS check FLE first:
 
 ```
 ┌─────────────────┐     RCON      ┌──────────────────┐
-│  TS Orchestrator │◄────────────►│  Factorio Mod    │
-│  (Claude Code)   │              │  (ai-companion)  │
+│  Claude Code    │◄────────────►│  Factorio Mod    │
+│  (Orchestrator) │              │  (ai-companion)  │
+│                 │              │                  │
+│  Handles ALL    │              │  Tick-based      │
+│  companions     │              │  queues          │
+│  (id=0,1,2,...) │              │                  │
 └─────────────────┘              └──────────────────┘
+        ▲
         │
-        ▼
-  Claude API (subagents per companion)
+   reactive-all.ts (polls ALL messages)
 ```
+
+**Key Design Principle (inspired by FLE):**
+- ONE orchestrator (Claude Code) manages ALL companions
+- Like FLE's namespaces: single Environment, multiple agents
+- NO separate subagent Tasks per companion
+- Reactive polling with message deduplication
 
 ## QUICK START - WHEN SESSION BEGINS (READ FIRST)
 
-**As the orchestrator (Claude Code), you MUST enter reactive mode immediately when the user wants to interact with Factorio.**
+**As the orchestrator (Claude Code), you manage ALL companions in a single reactive loop.**
 
-### Step-by-step:
+### The Reactive Loop (for ALL companions):
 
-1. **Launch reactive listener in background:**
+1. **Launch reactive-all.ts in background:**
    ```bash
-   bun run src/reactive.ts
+   bun run src/reactive-all.ts
    ```
-   Use `run_in_background: true`. Save the task_id.
+   Use `run_in_background: true`. Polls for messages for ALL companions (id=0, 1, 2, ...).
 
-2. **Block and wait for user message:**
+2. **Block and wait for messages:**
    ```typescript
    TaskOutput(task_id, block: true, timeout: 120000)
    ```
-   This waits until user writes `/fac <message>` in Factorio.
 
-3. **Parse the JSON output and respond:**
+3. **Parse the JSON array output:**
    ```json
-   {"player":"lveillard","message":"hola","tick":12345}
+   [
+     {"companionId": 0, "player": "lveillard", "message": "hola", "tick": 12345},
+     {"companionId": 1, "player": "lveillard", "message": "ve a minar cobre", "tick": 12346}
+   ]
    ```
-   Respond via RCON with `/fac_chat_say 0 <response>`.
 
-4. **Loop:** Go back to step 1. Restart reactive.ts for the next message.
+4. **Process EACH message:**
+   - If `companionId === 0`: Respond as orchestrator using `/fac_chat_say 0 "response"`
+   - If `companionId === 1, 2, ...`: Respond as that companion using `/fac_chat_say N "response"`, then execute actions
+
+5. **Loop:** Go back to step 1. Restart reactive-all.ts for next batch.
 
 ### When User Requests Companions:
 
 If user writes `/fac spawn 2` or asks for companions:
 1. Spawn entities via RCON: `/fac_companion_spawn id=1`, `/fac_companion_spawn id=2`
-2. Launch a Task subagent for EACH companion with the FULL PROMPT TEMPLATE below
-3. Continue your own reactive loop as orchestrator (id=0)
+2. **No Task subagents needed** - YOU handle their messages in your main loop
+3. Continue the reactive-all loop
 
 ## REACTIVE CHAT LOOP (CRITICAL)
 
-**This is how Claude communicates with Factorio. Follow this pattern exactly.**
+**This is how Claude communicates with Factorio AND manages all companions.**
 
-### The Loop
+### The Loop (for ALL companions)
 
 ```
-[1. Start reactive.ts] → [2. Wait for message] → [3. Process & Respond] → [4. Loop]
+[1. Start reactive-all.ts] → [2. Wait for messages] → [3. Process ALL] → [4. Loop]
 ```
 
-### Step 1: Start reactive listener (background)
+### Step 1: Start reactive-all listener (background)
 
 ```bash
-bun run src/reactive.ts
+bun run src/reactive-all.ts
 ```
-Run with `run_in_background: true`. This script polls RCON until a message arrives, then outputs JSON and exits.
+Run with `run_in_background: true`. This script polls RCON for ALL messages (orchestrator + all companions), then outputs JSON array and exits.
 
-### Step 2: Wait for message (blocking)
+### Step 2: Wait for messages (blocking)
 
 ```typescript
-TaskOutput(task_id, block: true, timeout: 60000)
+TaskOutput(task_id, block: true, timeout: 120000)
 ```
-This blocks until user writes `/fac <message>` in Factorio.
+This blocks until ANY user writes `/fac <message>` or `/fac N <message>` in Factorio.
 
-### Step 3: Parse output and respond
+### Step 3: Parse output and process ALL messages
 
-Output format:
+Output format (JSON array):
 ```json
-{"player":"username","message":"text here","tick":12345}
+[
+  {"companionId": 0, "player": "lveillard", "message": "hola", "tick": 12345},
+  {"companionId": 1, "player": "lveillard", "message": "ve a minar", "tick": 12346}
+]
 ```
 
-Respond via RCON:
-```bash
-bun -e "
-import { RCONClient } from './src/rcon/client';
-const client = new RCONClient({ host: '127.0.0.1', port: 34198, password: 'factorio' });
-await client.connect();
-await client.sendCommand('/fac_chat_say 0 Your response here');
-await client.disconnect();
-"
+Process each message:
+- **companionId === 0**: Respond as orchestrator
+- **companionId === 1, 2, ...**: Respond as that companion + execute actions
+
+Example response code:
+```typescript
+for (const msg of messages) {
+  if (msg.companionId === 0) {
+    // Respond as orchestrator
+    await rcon.sendCommand(`/fac_chat_say 0 "Hola!"`);
+  } else {
+    // Respond as companion
+    await rcon.sendCommand(`/fac_chat_say ${msg.companionId} "Entendido!"`);
+    // Execute actions (mining, movement, etc.)
+    await rcon.sendCommand(`/fac_move_follow ${msg.companionId} ${msg.player}`);
+  }
+}
 ```
 
 ### Step 4: Loop
 
-Go back to Step 1. Restart reactive.ts for the next message.
+Go back to Step 1. Restart reactive-all.ts for next batch of messages.
 
 ### Why One-Shot?
 
-Claude can only react when TaskOutput completes. The script exits when a message is found, triggering Claude to process it. This is the reactive pattern.
+Claude can only react when TaskOutput completes. The script exits when messages are found, triggering Claude to process them. This is the reactive pattern.
 
 ### Handling Disconnections
 
 If you see 3-4 consecutive ECONNREFUSED errors, Factorio has restarted or disconnected. When this happens:
-1. Kill all background bash tasks (reactive.ts, reactive-companion.ts)
-2. Kill all companion subagent Tasks
-3. Wait for user to confirm Factorio is back up
-4. Restart the reactive loop fresh
+1. Kill the background bash task (reactive-all.ts)
+2. Wait for user to confirm Factorio is back up
+3. Restart the reactive loop fresh
 
 ### Example Session
 
 ```typescript
-// 1. Start listener
-Bash: bun run src/reactive.ts (background, id: abc123)
+// 1. Spawn companions
+await rcon.sendCommand('/fac_companion_spawn id=1');
+await rcon.sendCommand('/fac_companion_spawn id=2');
 
-// 2. Wait
-TaskOutput(abc123, block: true, timeout: 60000)
-// User writes: /fac hola que tal
+// 2. Start listener
+Bash: bun run src/reactive-all.ts (background, id: abc123)
 
-// 3. Output received:
-{"player":"lveillard","message":"hola que tal","tick":12345}
+// 3. Wait
+TaskOutput(abc123, block: true, timeout: 120000)
 
-// 4. Respond
-Bash: bun -e "...client.sendCommand('/fac_chat_say 0 Hola! Todo bien.')..."
+// User writes: /fac hola
+// User writes: /fac 1 ve a minar cobre
 
-// 5. Loop - restart from step 1
+// 4. Output received:
+[
+  {"companionId": 0, "player": "lveillard", "message": "hola", "tick": 12345},
+  {"companionId": 1, "player": "lveillard", "message": "ve a minar cobre", "tick": 12346}
+]
+
+// 5. Process messages
+for (const msg of messages) {
+  if (msg.companionId === 0) {
+    await rcon.sendCommand(`/fac_chat_say 0 "Hola! ¿Cómo estás?"`);
+  } else if (msg.companionId === 1) {
+    await rcon.sendCommand(`/fac_chat_say 1 "Entendido, voy a minar cobre"`);
+    // Find copper ore
+    const nearest = await rcon.sendCommand(`/fac_resource_nearest 1 copper-ore`);
+    // Start mining
+    await rcon.sendCommand(`/fac_resource_mine_start 1 ${x} ${y} 50`);
+  }
+}
+
+// 6. Loop - restart from step 2
 ```
 
-## PARALLEL COMPANIONS (CRITICAL)
+## MANAGING COMPANIONS (CRITICAL)
 
-**Each companion is an INDEPENDENT subagent.** Do NOT respond on behalf of companions - spawn a subagent for each.
+**YOU (the orchestrator) manage ALL companions in a single reactive loop. NO separate subagent Tasks.**
 
-### Architecture
+### Architecture (FLE-inspired)
 
 ```
-Orchestrator (this Claude)
-├── reactive.ts → messages without target_companion → responds as id=0
+Claude Code (Single Orchestrator)
+├── reactive-all.ts (background bash)
+│   └── Polls ALL messages for id=0, 1, 2, ...
 │
-└── For each companion:
-    └── Task tool (subagent) → reactive-companion.ts <id> → responds as id=N
+└── Main Loop:
+    ├── Process message for id=0 → respond as orchestrator
+    ├── Process message for id=1 → respond + execute actions as Companion #1
+    └── Process message for id=2 → respond + execute actions as Companion #2
 ```
 
-### Spawning Companion Subagents
+### When User Requests Companions:
 
-When user requests spawn (e.g., `/fac spawn 2`):
+User writes `/fac spawn 2`:
 
 1. **Spawn entities via RCON:**
    ```bash
@@ -159,37 +206,9 @@ When user requests spawn (e.g., `/fac spawn 2`):
    /fac_companion_spawn id=2
    ```
 
-2. **Launch a Task subagent for EACH companion with this FULL PROMPT:**
+2. **No Task subagents needed** - YOU handle their messages directly in your main reactive-all loop
 
-```
-You are Companion #N in Factorio. ID=N. Respond in the player's language.
-
-REACTIVE LOOP (mandatory):
-1. Bash(run_in_background=true): bun run src/reactive-companion.ts N
-2. TaskOutput(task_id, block=true, timeout=120000)
-3. Parse JSON: {"companionId":N,"player":"...","message":"...","tick":...}
-4. Respond via RCON, execute actions
-5. GOTO 1
-
-FORBIDDEN: sleep, cat, Read on output files, manual polling. ONLY use reactive-companion.ts + TaskOutput.
-
-COMMANDS (replace N with your ID):
--- Chat: /fac_chat_say N "msg"
--- Move: /fac_move_to N x y | /fac_move_follow N player | /fac_move_stop N
--- Mine: /fac_resource_nearest N type | /fac_resource_list N [filter] [radius] | /fac_resource_mine_start N x y [count] | _status | _stop
--- Items: /fac_item_pick N | /fac_item_craft_start N item [count] | _status | _stop | /fac_item_recipes N filter
--- Build: /fac_building_place N entity x y [dir] | /fac_building_remove N x y | _info | _fill item [n] | _empty item | _fuel item
--- Combat: /fac_world_enemies N [radius] | /fac_action_attack_start N x y | _status | _stop | /fac_action_defend N on|off
--- Status: /fac_companion_position N | /fac_companion_inventory N | /fac_companion_health N | /fac_world_scan N [radius]
-
-RULES: Use your ID in all commands. Respond with /fac_chat_say before actions. Report errors. Exit on 3+ ECONNREFUSED.
-```
-
-3. **Each subagent runs independently:**
-   - Listens with `bun run src/reactive-companion.ts <id>`
-   - Waits with TaskOutput blocking
-   - Responds using `/fac_chat_say <id> message`
-   - Loops back to listen
+3. **Continue the loop** - reactive-all.ts will now include their messages
 
 ### Example: User writes `/fac 1 sigueme`
 
@@ -198,22 +217,22 @@ User → /fac 1 sigueme
          ↓
 Factorio stores {target_companion: 1, message: "sigueme"}
          ↓
-Companion #1's reactive-companion.ts receives it
+reactive-all.ts receives it in next poll
          ↓
-Companion #1's subagent processes: "sigueme" → follow command
+YOU (orchestrator) process it:
+  - Respond: /fac_chat_say 1 "Entendido, te sigo!"
+  - Execute: /fac_move_follow 1 lveillard
          ↓
-Subagent responds: /fac_chat_say 1 "Entendido, te sigo!"
-Subagent executes: /fac_move_follow 1 lveillard
-         ↓
-Subagent loops back to listen
+Loop back to wait for next messages
 ```
 
 ### Key Rules
 
-1. **Orchestrator (id=0)**: Handles `/fac <message>` (no target)
-2. **Companions (id=N)**: Each has its own subagent handling `/fac N <message>`
-3. **NEVER respond for a companion** - the subagent does that
-4. **Each subagent has its own context** - independent conversations
+1. **ONE orchestrator** (Claude Code) manages ALL companions
+2. **NO Task subagents** for companions - you handle everything
+3. **Respond with correct companionId** using `/fac_chat_say N "message"`
+4. **Use companion's ID in all commands** (move, mine, craft, etc.)
+5. **Like FLE's namespaces** - single Environment, multiple agents sharing one executor
 
 ## Project Structure
 
@@ -222,8 +241,10 @@ factorio-ai-companion/          # THIS REPO
 ├── src/
 │   ├── rcon/client.ts          # RCON client
 │   ├── mcp/server.ts           # MCP server (stdio)
-│   ├── reactive.ts             # One-shot message waiter
-│   ├── daemon.ts               # Continuous polling
+│   ├── reactive-all.ts         # ⭐ NEW: Polls ALL companions (id=0,1,2,...)
+│   ├── reactive.ts             # DEPRECATED: One-shot for orchestrator only
+│   ├── reactive-companion.ts   # DEPRECATED: One-shot for specific companion
+│   ├── daemon.ts               # Continuous polling (unused)
 │   └── skills/                 # TypeScript skills
 ├── factorio-mod/               # Source for Factorio mod
 │   ├── control.lua
