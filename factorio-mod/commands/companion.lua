@@ -7,11 +7,10 @@ commands.add_command("fac_companion_list", nil, function(cmd)
     for id, c in pairs(storage.companions) do
       if c.entity and c.entity.valid then
         local pos = c.entity.position
-        local max_h = c.entity.max_health or (c.entity.prototype and c.entity.prototype.max_health) or 100
         list[#list + 1] = {
           id = id,
           position = {x = math.floor(pos.x * 10) / 10, y = math.floor(pos.y * 10) / 10},
-          health = math.floor(c.entity.health / max_h * 100),
+          health = math.floor(c.entity.health / c.entity.max_health * 100),
           name = c.name
         }
       end

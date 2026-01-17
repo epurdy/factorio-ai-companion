@@ -25,7 +25,7 @@ commands.add_command("fac_world_enemies", nil, function(cmd)
           type = e.type,
           position = {x = math.floor(e.position.x), y = math.floor(e.position.y)},
           health = e.health,
-          max_health = e.max_health or (e.prototype and e.prototype.max_health) or 0,
+          max_health = e.max_health,
           distance = math.floor(u.distance(c.entity.position, e.position))
         }
       end
