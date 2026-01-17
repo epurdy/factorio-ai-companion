@@ -1,5 +1,6 @@
 -- AI Companion v0.7.0 - Resource commands
 local u = require("commands.init")
+local queues = require("commands.queues")
 
 local normalize = {copper = "copper-ore", iron = "iron-ore", coal = "coal", stone = "stone", uranium = "uranium-ore", oil = "crude-oil"}
 
@@ -24,28 +25,47 @@ commands.add_command("fac_resource_list", nil, function(cmd)
   if not ok then u.error_response(err) end
 end)
 
+-- Realistic mining using tick-based queue system
 commands.add_command("fac_resource_mine", nil, function(cmd)
   local ok, err = pcall(function()
-    local args = u.parse_args("^(%S+)%s+([%d.-]+)%s+([%d.-]+)%s*(%d*)$", cmd.parameter)
+    local args = u.parse_args("^(%S+)%s+(%-?%d+%.?%d*)%s+(%-?%d+%.?%d*)%s*(%d*)$", cmd.parameter)
     local id, c = u.find_companion(args[1])
     if not id then u.error_response("Companion not found"); return end
     local x, y, count = tonumber(args[2]), tonumber(args[3]), tonumber(args[4]) or 1
     if not x or not y then u.error_response("Invalid coordinates"); return end
     local tpos = {x = x, y = y}
-    local res = c.entity.surface.find_entities_filtered{type = "resource", position = tpos, radius = 2, limit = 1}
-    if #res == 0 then u.json_response({id = id, error = "No resource"}); return end
-    local r = res[1]
     if u.distance(c.entity.position, tpos) > 5 then u.json_response({id = id, error = "Too far"}); return end
-    local to_mine = math.min(count, r.amount)
-    if c.entity.mine_entity(r, false) then
-      u.json_response({id = id, mined = true, resource = r.name})
+    -- Start realistic mining via queue system
+    local result = queues.start_harvest(id, tpos, count)
+    if result then
+      u.json_response({id = id, mining = true, target = count, entities = result.entities or 0, status = "started"})
     else
-      local item = r.prototype.mineable_properties.products[1].name
-      r.amount = r.amount - to_mine
-      c.entity.insert{name = item, count = to_mine}
-      if r.amount <= 0 then r.destroy() end
-      u.json_response({id = id, mined = true, resource = r.name, amount = to_mine, item = item})
+      u.json_response({id = id, error = "Failed to start mining"})
     end
+  end)
+  if not ok then u.error_response(err) end
+end)
+
+-- Check mining status
+commands.add_command("fac_resource_mine_status", nil, function(cmd)
+  local ok, err = pcall(function()
+    local args = u.parse_args("^(%S+)$", cmd.parameter)
+    local id = u.find_companion(args[1])
+    if not id then u.error_response("Companion not found"); return end
+    local status = queues.get_harvest_status(id)
+    u.json_response({id = id, status = status})
+  end)
+  if not ok then u.error_response(err) end
+end)
+
+-- Stop mining
+commands.add_command("fac_resource_mine_stop", nil, function(cmd)
+  local ok, err = pcall(function()
+    local args = u.parse_args("^(%S+)$", cmd.parameter)
+    local id = u.find_companion(args[1])
+    if not id then u.error_response("Companion not found"); return end
+    local result = queues.stop_harvest(id)
+    u.json_response({id = id, stopped = result.stopped, harvested = result.harvested or 0})
   end)
   if not ok then u.error_response(err) end
 end)

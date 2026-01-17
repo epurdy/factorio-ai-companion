@@ -1,5 +1,6 @@
--- AI Companion v0.7.0 - Building commands
+-- AI Companion v0.8.0 - Building commands
 local u = require("commands.init")
+local queues = require("commands.queues")
 
 commands.add_command("fac_building_can_place", nil, function(cmd)
   local ok, err = pcall(function()
@@ -184,6 +185,33 @@ commands.add_command("fac_building_fill", nil, function(cmd)
     end
     if ins > 0 then u.json_response({id = id, inserted = ins, item = item})
     else u.json_response({id = id, error = "Could not insert"}) end
+  end)
+  if not ok then u.error_response(err) end
+end)
+
+-- Realistic tick-based building placement
+commands.add_command("fac_building_place_start", nil, function(cmd)
+  local ok, err = pcall(function()
+    local args = u.parse_args("^(%S+)%s+(%S+)%s+(%-?%d+%.?%d*)%s+(%-?%d+%.?%d*)%s*(%S*)$", cmd.parameter)
+    local id, c = u.find_companion(args[1])
+    if not id then u.error_response("Companion not found"); return end
+    local entity = args[2]
+    local x, y = tonumber(args[3]), tonumber(args[4])
+    local dir = args[5] ~= "" and defines.direction[args[5]] or defines.direction.north
+    local result = queues.start_build(id, entity, {x = x, y = y}, dir)
+    result.id = id
+    u.json_response(result)
+  end)
+  if not ok then u.error_response(err) end
+end)
+
+commands.add_command("fac_building_place_status", nil, function(cmd)
+  local ok, err = pcall(function()
+    local args = u.parse_args("^(%S+)$", cmd.parameter)
+    local id = u.find_companion(args[1])
+    if not id then u.error_response("Companion not found"); return end
+    local status = queues.get_build_status(id)
+    u.json_response({id = id, status = status})
   end)
   if not ok then u.error_response(err) end
 end)

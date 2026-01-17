@@ -1,5 +1,4 @@
 -- AI Companion v0.7.0 - Data definitions
-
 data:extend({
   {
     type = "sound",

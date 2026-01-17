@@ -1,9 +1,9 @@
 {
   "name": "ai-companion",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "title": "AI Companion",
   "author": "lveillard",
   "factorio_version": "2.0",
-  "description": "AI companions with 38 RCON commands. Factorio 2.x compatible.",
+  "description": "AI companions with 50 RCON commands. FLE-inspired tick-based queues for realistic mining, crafting, building, and combat. Factorio 2.x compatible.",
   "dependencies": ["base >= 2.0"]
 }

@@ -1,5 +1,6 @@
--- AI Companion v0.7.0 - Factorio 2.x
+-- AI Companion v0.8.0 - Factorio 2.x
 local u = require("commands.init")
+local queues = require("commands.queues")
 
 local function init_storage()
   storage.companion_messages = storage.companion_messages or {}
@@ -8,6 +9,7 @@ local function init_storage()
   storage.walking_queues = storage.walking_queues or {}
   storage.context_clear_requests = storage.context_clear_requests or {}
   storage.errors = storage.errors or {}
+  queues.init()
 end
 
 local function cleanup_messages()
@@ -25,12 +27,12 @@ end
 
 script.on_init(function()
   init_storage()
-  game.print("[AI Companion] v0.7.0 ready. /fac for help", u.print_color(u.COLORS.system))
+  game.print("[AI Companion] v0.8.0 ready. /fac for help", u.print_color(u.COLORS.system))
 end)
 
 script.on_configuration_changed(function()
   init_storage()
-  game.print("[AI Companion] Updated to v0.7.0", u.print_color(u.COLORS.system))
+  game.print("[AI Companion] Updated to v0.8.0", u.print_color(u.COLORS.system))
 end)
 
 local subcommands = {}
@@ -126,11 +128,18 @@ require("commands.move")
 require("commands.research")
 require("commands.resource")
 require("commands.world")
+require("commands.combat")
 require("commands.help")
 
 script.on_nth_tick(5, function(ev)
-  if not storage.walking_queues then return end
   if ev.tick % 1800 == 0 then cleanup_messages() end
+  -- Process all tick-based queues (realistic actions)
+  queues.tick_harvest_queues()
+  queues.tick_craft_queues()
+  queues.tick_build_queues()
+  queues.tick_combat_queues()
+  -- Process walking queues
+  if not storage.walking_queues then return end
   for cid, q in pairs(storage.walking_queues) do
     local c = u.get_companion(cid)
     if not c then storage.walking_queues[cid] = nil; goto skip end
