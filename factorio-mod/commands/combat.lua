@@ -1,4 +1,4 @@
--- AI Companion v0.8.0 - Combat commands
+-- AI Companion v0.9.0 - Combat commands
 local u = require("commands.init")
 local queues = require("commands.queues")
 

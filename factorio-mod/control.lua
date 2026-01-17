@@ -1,4 +1,4 @@
--- AI Companion v0.8.0 - Factorio 2.x
+-- AI Companion v0.9.0 - Factorio 2.x
 local u = require("commands.init")
 local queues = require("commands.queues")
 
@@ -27,12 +27,12 @@ end
 
 script.on_init(function()
   init_storage()
-  game.print("[AI Companion] v0.8.0 ready. /fac for help", u.print_color(u.COLORS.system))
+  game.print("[AI Companion] v0.9.0 ready. /fac for help", u.print_color(u.COLORS.system))
 end)
 
 script.on_configuration_changed(function()
   init_storage()
-  game.print("[AI Companion] Updated to v0.8.0", u.print_color(u.COLORS.system))
+  game.print("[AI Companion] Updated to v0.9.0", u.print_color(u.COLORS.system))
 end)
 
 local subcommands = {}

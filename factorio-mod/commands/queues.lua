@@ -1,4 +1,4 @@
--- AI Companion v0.8.0 - Tick-based queue system
+-- AI Companion v0.9.0 - Tick-based queue system
 local u = require("commands.init")
 
 local M = {}
