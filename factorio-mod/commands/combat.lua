@@ -32,13 +32,7 @@ commands.add_command("fac_world_enemies", nil, function(cmd)
     end
 
     table.sort(result, function(a, b) return a.distance < b.distance end)
-
-    -- Limit to 20 enemies
-    if #result > 20 then
-      local t = {}
-      for i = 1, 20 do t[i] = result[i] end
-      result = t
-    end
+    while #result > 20 do table.remove(result) end
 
     local threat = "safe"
     if #result > 5 then threat = "danger"

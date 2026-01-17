@@ -1,4 +1,4 @@
--- AI Companion v0.7.0 - Resource commands
+-- AI Companion v0.8.0 - Resource commands
 local u = require("commands.init")
 local queues = require("commands.queues")
 

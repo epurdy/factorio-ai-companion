@@ -1,165 +1,156 @@
--- AI Companion v0.8.0 - DRY tick-based queue system
--- Inspired by FLE's harvest_resource implementation
+-- AI Companion v0.8.0 - Tick-based queue system
 local u = require("commands.init")
 
 local M = {}
 
--- Initialize all queue storages
+-- Constants
+local TICK_INTERVAL = 5
+local MIN_ACTION_TICKS = 30
+local BUILD_TICKS = 60
+local ATTACK_COOLDOWN = 15
+local ATTACK_RANGE = 6
+local MINING_RANGE = 5
+
+-- Validate companion exists and is valid
+local function valid_companion(id)
+  local c = u.get_companion(id)
+  return c and c.entity and c.entity.valid and c
+end
+
+-- Generic queue processor - eliminates repetition across all tick functions
+local function process_queue(queue_name, processor)
+  local queues = storage[queue_name]
+  if not queues then return end
+
+  local to_remove = {}
+  for cid, q in pairs(queues) do
+    local c = valid_companion(cid)
+    if not c then
+      to_remove[#to_remove + 1] = cid
+    else
+      local should_remove = processor(cid, q, c)
+      if should_remove then to_remove[#to_remove + 1] = cid end
+    end
+  end
+
+  for _, cid in ipairs(to_remove) do queues[cid] = nil end
+end
+
 function M.init()
   storage.harvest_queues = storage.harvest_queues or {}
   storage.craft_queues = storage.craft_queues or {}
   storage.build_queues = storage.build_queues or {}
   storage.combat_queues = storage.combat_queues or {}
-  storage.path_queues = storage.path_queues or {}  -- For future pathfinding
 end
 
--- ============ HARVEST QUEUE ============
+-- ============ HARVEST ============
 
-function M.start_harvest(companion_id, position, target_count)
-  local c = u.get_companion(companion_id)
-  if not c or not c.entity or not c.entity.valid then return nil end
+function M.start_harvest(cid, position, target_count)
+  local c = valid_companion(cid)
+  if not c then return {error = "Invalid companion"} end
 
-  local surface = c.entity.surface
-  local entities = surface.find_entities_filtered{
-    position = position,
-    radius = 3,
-    type = "resource"
+  local entities = c.entity.surface.find_entities_filtered{
+    position = position, radius = 3, type = "resource"
   }
-
   if #entities == 0 then return {error = "No resource"} end
 
-  -- Sort by distance
   table.sort(entities, function(a, b)
     return u.distance(a.position, c.entity.position) < u.distance(b.position, c.entity.position)
   end)
 
-  -- Create queue
-  storage.harvest_queues[companion_id] = {
+  storage.harvest_queues[cid] = {
     entities = entities,
     position = position,
     target = target_count,
     harvested = 0,
-    current = nil,
-    start_tick = game.tick
+    current = nil
   }
 
-  -- Start mining first entity
-  M.start_mining_next(companion_id)
-
+  M.start_mining_next(cid)
   return {started = true, entities = #entities, target = target_count}
 end
 
-function M.start_mining_next(companion_id)
-  local q = storage.harvest_queues[companion_id]
-  if not q or #q.entities == 0 then return false end
+function M.start_mining_next(cid)
+  local q = storage.harvest_queues[cid]
+  if not q then return false end
 
-  local c = u.get_companion(companion_id)
-  if not c or not c.entity or not c.entity.valid then
-    storage.harvest_queues[companion_id] = nil
+  local c = valid_companion(cid)
+  if not c then
+    storage.harvest_queues[cid] = nil
     return false
   end
 
-  local entity = table.remove(q.entities, 1)
-  if not entity or not entity.valid then
-    -- Try next entity
-    return M.start_mining_next(companion_id)
+  while #q.entities > 0 do
+    local entity = table.remove(q.entities, 1)
+    if entity and entity.valid then
+      c.entity.update_selected_entity(entity.position)
+      c.entity.mining_state = {mining = true, position = entity.position}
+      q.current = {
+        entity = entity,
+        start_tick = game.tick,
+        mining_time = (entity.prototype.mineable_properties.mining_time or 1) * 60
+      }
+      return true
+    end
   end
-
-  -- Set mining state for realistic animation
-  c.entity.update_selected_entity(entity.position)
-  c.entity.mining_state = {mining = true, position = entity.position}
-
-  q.current = {
-    entity = entity,
-    start_tick = game.tick,
-    mining_time = (entity.prototype.mineable_properties.mining_time or 1) * 60
-  }
-
-  return true
+  return false
 end
 
 function M.tick_harvest_queues()
-  if not storage.harvest_queues then return end
-
-  for cid, q in pairs(storage.harvest_queues) do
-    local c = u.get_companion(cid)
-    if not c or not c.entity or not c.entity.valid then
-      storage.harvest_queues[cid] = nil
-      goto continue
-    end
-
-    -- Check if we're done
+  process_queue("harvest_queues", function(cid, q, c)
     if q.harvested >= q.target then
       c.entity.mining_state = {mining = false}
-      storage.harvest_queues[cid] = nil
-      goto continue
+      return true
     end
 
-    -- Check distance
-    if u.distance(c.entity.position, q.position) > 5 then
-      -- Too far, stop mining
+    if u.distance(c.entity.position, q.position) > MINING_RANGE then
       c.entity.mining_state = {mining = false}
-      storage.harvest_queues[cid] = nil
-      goto continue
+      return true
     end
 
-    -- Process current mining
     if not q.current then
-      -- No current entity, try to get next
       if not M.start_mining_next(cid) then
         c.entity.mining_state = {mining = false}
-        storage.harvest_queues[cid] = nil
+        return true
       end
-      goto continue
+      return false
     end
 
     local current = q.current
-    local entity = current.entity
-
-    if not entity or not entity.valid then
+    if not current.entity or not current.entity.valid then
       q.current = nil
       M.start_mining_next(cid)
-      goto continue
+      return false
     end
 
-    -- Check if mining time has passed (minimum 30 ticks for realism)
-    local ticks_mining = game.tick - current.start_tick
-    local required_ticks = math.max(30, current.mining_time)
-
-    if ticks_mining >= required_ticks then
-      -- Mine the entity for real
+    local elapsed = game.tick - current.start_tick
+    if elapsed >= math.max(MIN_ACTION_TICKS, current.mining_time) then
       local inv_before = c.entity.get_main_inventory().get_contents()
-      local mined = c.entity.mine_entity(entity, true)
+      local mined = c.entity.mine_entity(current.entity, true)
 
       if mined then
         local inv_after = c.entity.get_main_inventory().get_contents()
-        local items_added = 0
-
-        for name, after_count in pairs(inv_after) do
-          local before_count = inv_before[name] and inv_before[name].count or 0
-          items_added = items_added + (after_count.count - before_count)
+        local added = 0
+        for name, data in pairs(inv_after) do
+          local before = inv_before[name] and inv_before[name].count or 0
+          added = added + (data.count - before)
         end
-
-        q.harvested = q.harvested + math.max(1, items_added)
+        q.harvested = q.harvested + math.max(1, added)
       end
 
       q.current = nil
-
-      -- Check if done or continue
       if q.harvested >= q.target then
         c.entity.mining_state = {mining = false}
-        storage.harvest_queues[cid] = nil
-      else
-        M.start_mining_next(cid)
+        return true
       end
+      M.start_mining_next(cid)
     end
-
-    ::continue::
-  end
+    return false
+  end)
 end
 
-function M.get_harvest_status(companion_id)
-  local q = storage.harvest_queues[companion_id]
+function M.get_harvest_status(cid)
+  local q = storage.harvest_queues[cid]
   if not q then return {active = false} end
   return {
     active = true,
@@ -170,205 +161,166 @@ function M.get_harvest_status(companion_id)
   }
 end
 
-function M.stop_harvest(companion_id)
-  local q = storage.harvest_queues[companion_id]
-  if q then
-    local c = u.get_companion(companion_id)
-    if c and c.entity and c.entity.valid then
-      c.entity.mining_state = {mining = false}
-    end
-    local harvested = q.harvested
-    storage.harvest_queues[companion_id] = nil
-    return {stopped = true, harvested = harvested}
-  end
-  return {stopped = false}
+function M.stop_harvest(cid)
+  local q = storage.harvest_queues[cid]
+  if not q then return {stopped = false} end
+
+  local c = valid_companion(cid)
+  if c then c.entity.mining_state = {mining = false} end
+
+  local harvested = q.harvested
+  storage.harvest_queues[cid] = nil
+  return {stopped = true, harvested = harvested}
 end
 
--- ============ CRAFT QUEUE ============
+-- ============ CRAFT ============
 
-function M.start_craft(companion_id, recipe, count)
-  local c = u.get_companion(companion_id)
-  if not c or not c.entity or not c.entity.valid then return {error = "Companion not found"} end
+function M.start_craft(cid, recipe, count)
+  local c = valid_companion(cid)
+  if not c then return {error = "Invalid companion"} end
 
-  local recipe_proto = prototypes.recipe[recipe]
-  if not recipe_proto then return {error = "Unknown recipe: " .. recipe} end
+  local proto = prototypes.recipe[recipe]
+  if not proto then return {error = "Unknown recipe: " .. recipe} end
 
-  -- Check if can craft (has ingredients)
-  local can_craft = c.entity.get_craftable_count(recipe)
-  if can_craft < 1 then return {error = "Missing ingredients for " .. recipe} end
+  local craftable = c.entity.get_craftable_count(recipe)
+  if craftable < 1 then return {error = "Missing ingredients"} end
 
-  local actual_count = math.min(count, can_craft)
-  local ticks_per_craft = math.max(30, (recipe_proto.energy or 0.5) * 60)
+  local actual = math.min(count, craftable)
+  local ticks = math.max(MIN_ACTION_TICKS, (proto.energy or 0.5) * 60)
 
-  storage.craft_queues[companion_id] = {
+  storage.craft_queues[cid] = {
     recipe = recipe,
-    target = actual_count,
+    target = actual,
     crafted = 0,
-    ticks_per_item = ticks_per_craft,
-    current_start_tick = game.tick
+    ticks_per = ticks,
+    tick_start = game.tick
   }
 
-  return {started = true, recipe = recipe, target = actual_count, ticks_per_item = ticks_per_craft}
+  return {started = true, recipe = recipe, target = actual, ticks_per = ticks}
 end
 
 function M.tick_craft_queues()
-  if not storage.craft_queues then return end
+  process_queue("craft_queues", function(cid, q, c)
+    local elapsed = game.tick - q.tick_start
+    if elapsed < q.ticks_per then return false end
 
-  for cid, q in pairs(storage.craft_queues) do
-    local c = u.get_companion(cid)
-    if not c or not c.entity or not c.entity.valid then
-      storage.craft_queues[cid] = nil
-      goto continue
-    end
+    local crafted = c.entity.begin_crafting{recipe = q.recipe, count = 1}
+    if crafted < 1 then return true end
 
-    local elapsed = game.tick - q.current_start_tick
-    if elapsed >= q.ticks_per_item then
-      local crafted = c.entity.begin_crafting{recipe = q.recipe, count = 1}
-      if crafted > 0 then
-        q.crafted = q.crafted + 1
-        q.current_start_tick = game.tick
-      else
-        -- Can't craft anymore (missing ingredients)
-        storage.craft_queues[cid] = nil
-        goto continue
-      end
-
-      if q.crafted >= q.target then
-        storage.craft_queues[cid] = nil
-      end
-    end
-    ::continue::
-  end
+    q.crafted = q.crafted + 1
+    q.tick_start = game.tick
+    return q.crafted >= q.target
+  end)
 end
 
-function M.get_craft_status(companion_id)
-  local q = storage.craft_queues[companion_id]
+function M.get_craft_status(cid)
+  local q = storage.craft_queues[cid]
   if not q then return {active = false} end
   return {
     active = true,
     recipe = q.recipe,
     crafted = q.crafted,
     target = q.target,
-    progress = math.floor((game.tick - q.current_start_tick) / q.ticks_per_item * 100)
+    progress = math.floor((game.tick - q.tick_start) / q.ticks_per * 100)
   }
 end
 
-function M.stop_craft(companion_id)
-  local q = storage.craft_queues[companion_id]
-  if q then
-    local crafted = q.crafted
-    storage.craft_queues[companion_id] = nil
-    return {stopped = true, crafted = crafted}
-  end
-  return {stopped = false}
+function M.stop_craft(cid)
+  local q = storage.craft_queues[cid]
+  if not q then return {stopped = false} end
+  local crafted = q.crafted
+  storage.craft_queues[cid] = nil
+  return {stopped = true, crafted = crafted}
 end
 
--- ============ BUILD QUEUE ============
+-- ============ BUILD ============
 
-function M.start_build(companion_id, entity, position, direction)
-  local c = u.get_companion(companion_id)
-  if not c or not c.entity or not c.entity.valid then return {error = "Companion not found"} end
+function M.start_build(cid, entity_name, position, direction)
+  local c = valid_companion(cid)
+  if not c then return {error = "Invalid companion"} end
 
   local dir = direction or defines.direction.north
   local dist = u.distance(c.entity.position, position)
+  local reach = c.entity.build_distance or 10
 
-  if dist > (c.entity.build_distance or 10) then
-    return {error = "Too far to build (distance: " .. math.floor(dist) .. ")"}
+  if dist > reach then
+    return {error = "Too far (dist: " .. math.floor(dist) .. ", reach: " .. reach .. ")"}
   end
 
   local inv = c.entity.get_main_inventory()
-  if inv.get_item_count(entity) < 1 then
-    return {error = "No " .. entity .. " in inventory"}
+  if inv.get_item_count(entity_name) < 1 then
+    return {error = "No " .. entity_name .. " in inventory"}
   end
 
-  if not c.entity.surface.can_place_entity{name = entity, position = position, direction = dir, force = c.entity.force} then
-    return {error = "Cannot place " .. entity .. " at this position"}
+  local surface = c.entity.surface
+  if not surface.can_place_entity{name = entity_name, position = position, direction = dir, force = c.entity.force} then
+    return {error = "Cannot place here"}
   end
 
-  storage.build_queues[companion_id] = {
-    entity = entity,
+  storage.build_queues[cid] = {
+    entity = entity_name,
     position = position,
     direction = dir,
-    start_tick = game.tick,
-    build_time = 60  -- 1 second
+    tick_start = game.tick
   }
 
-  return {started = true, entity = entity, position = position, build_time = 60}
+  return {started = true, entity = entity_name, position = position}
 end
 
 function M.tick_build_queues()
-  if not storage.build_queues then return end
+  process_queue("build_queues", function(cid, q, c)
+    if game.tick - q.tick_start < BUILD_TICKS then return false end
 
-  for cid, q in pairs(storage.build_queues) do
-    local c = u.get_companion(cid)
-    if not c or not c.entity or not c.entity.valid then
-      storage.build_queues[cid] = nil
-      goto continue
-    end
-
-    local elapsed = game.tick - q.start_tick
-    if elapsed >= q.build_time then
-      local placed = c.entity.surface.create_entity{
-        name = q.entity,
-        position = q.position,
-        direction = q.direction,
-        force = c.entity.force
-      }
-
-      if placed then
-        c.entity.remove_item{name = q.entity, count = 1}
-      end
-
-      storage.build_queues[cid] = nil
-    end
-    ::continue::
-  end
+    local placed = c.entity.surface.create_entity{
+      name = q.entity,
+      position = q.position,
+      direction = q.direction,
+      force = c.entity.force
+    }
+    if placed then c.entity.remove_item{name = q.entity, count = 1} end
+    return true
+  end)
 end
 
-function M.get_build_status(companion_id)
-  local q = storage.build_queues[companion_id]
+function M.get_build_status(cid)
+  local q = storage.build_queues[cid]
   if not q then return {active = false} end
-  local elapsed = game.tick - q.start_tick
   return {
     active = true,
     entity = q.entity,
     position = q.position,
-    progress = math.floor(elapsed / q.build_time * 100)
+    progress = math.floor((game.tick - q.tick_start) / BUILD_TICKS * 100)
   }
 end
 
-function M.stop_build(companion_id)
-  local q = storage.build_queues[companion_id]
-  if q then
-    storage.build_queues[companion_id] = nil
-    return {stopped = true}
-  end
-  return {stopped = false}
+function M.stop_build(cid)
+  if not storage.build_queues[cid] then return {stopped = false} end
+  storage.build_queues[cid] = nil
+  return {stopped = true}
 end
 
--- ============ COMBAT QUEUE ============
+-- ============ COMBAT ============
 
-function M.start_combat(companion_id, target_position)
-  local c = u.get_companion(companion_id)
-  if not c or not c.entity or not c.entity.valid then return {error = "Companion not found"} end
+function M.start_combat(cid, target_pos)
+  local c = valid_companion(cid)
+  if not c then return {error = "Invalid companion"} end
 
   local enemies = c.entity.surface.find_entities_filtered{
-    position = target_position,
+    position = target_pos,
     radius = 10,
     force = "enemy",
     type = {"unit", "unit-spawner"}
   }
-
-  if #enemies == 0 then return {error = "No enemies at position"} end
+  if #enemies == 0 then return {error = "No enemies"} end
 
   table.sort(enemies, function(a, b)
     return u.distance(a.position, c.entity.position) < u.distance(b.position, c.entity.position)
   end)
 
-  storage.combat_queues[companion_id] = {
+  storage.combat_queues[cid] = {
     targets = enemies,
-    current_target = enemies[1],
-    attack_cooldown = 0,
+    current = enemies[1],
+    cooldown = 0,
     kills = 0
   }
 
@@ -376,86 +328,70 @@ function M.start_combat(companion_id, target_position)
 end
 
 function M.tick_combat_queues()
-  if not storage.combat_queues then return end
-
-  for cid, q in pairs(storage.combat_queues) do
-    local c = u.get_companion(cid)
-    if not c or not c.entity or not c.entity.valid then
-      storage.combat_queues[cid] = nil
-      goto continue
+  process_queue("combat_queues", function(cid, q, c)
+    if q.cooldown > 0 then
+      q.cooldown = q.cooldown - TICK_INTERVAL
+      return false
     end
 
-    if q.attack_cooldown > 0 then
-      q.attack_cooldown = q.attack_cooldown - 5
-      goto continue
-    end
-
-    -- Check if current target is still valid
-    if not q.current_target or not q.current_target.valid then
-      q.kills = q.kills + 1
-      -- Find next valid target
-      local found = false
-      for i, t in ipairs(q.targets) do
-        if t.valid then
-          q.current_target = t
-          table.remove(q.targets, i)
-          found = true
-          break
-        end
+    if not q.current or not q.current.valid then
+      -- Find next valid target (build new list to avoid mutation during iteration)
+      local valid_targets = {}
+      for _, t in ipairs(q.targets) do
+        if t.valid then valid_targets[#valid_targets + 1] = t end
       end
-      if not found then
+      q.targets = valid_targets
+
+      if #q.targets == 0 then
         c.entity.shooting_state = {state = defines.shooting.not_shooting}
-        storage.combat_queues[cid] = nil
-        goto continue
+        return true
       end
+      q.current = table.remove(q.targets, 1)
     end
 
-    local dist = u.distance(c.entity.position, q.current_target.position)
+    local dist = u.distance(c.entity.position, q.current.position)
 
-    if dist <= 6 then
-      -- In range, attack
+    if dist <= ATTACK_RANGE then
       c.entity.shooting_state = {
         state = defines.shooting.shooting_enemies,
-        position = q.current_target.position
+        position = q.current.position
       }
-      q.attack_cooldown = 15  -- 0.25s between shots
+      q.cooldown = ATTACK_COOLDOWN
     else
-      -- Move closer
       c.entity.shooting_state = {state = defines.shooting.not_shooting}
-      local dir = u.get_direction(c.entity.position, q.current_target.position)
-      if dir then
-        c.entity.walking_state = {walking = true, direction = dir}
-      end
+      local dir = u.get_direction(c.entity.position, q.current.position)
+      if dir then c.entity.walking_state = {walking = true, direction = dir} end
     end
-
-    ::continue::
-  end
+    return false
+  end)
 end
 
-function M.get_combat_status(companion_id)
-  local q = storage.combat_queues[companion_id]
+function M.get_combat_status(cid)
+  local q = storage.combat_queues[cid]
   if not q then return {active = false} end
+
+  local remaining = #q.targets
+  if q.current and q.current.valid then remaining = remaining + 1 end
+
   return {
     active = true,
-    targets_remaining = #q.targets + (q.current_target and q.current_target.valid and 1 or 0),
-    kills = q.kills,
-    current_target = q.current_target and q.current_target.valid and q.current_target.name or nil
+    targets_remaining = remaining,
+    current_target = q.current and q.current.valid and q.current.name or nil
   }
 end
 
-function M.stop_combat(companion_id)
-  local q = storage.combat_queues[companion_id]
-  if q then
-    local c = u.get_companion(companion_id)
-    if c and c.entity and c.entity.valid then
-      c.entity.shooting_state = {state = defines.shooting.not_shooting}
-      c.entity.walking_state = {walking = false}
-    end
-    local kills = q.kills
-    storage.combat_queues[companion_id] = nil
-    return {stopped = true, kills = kills}
+function M.stop_combat(cid)
+  local q = storage.combat_queues[cid]
+  if not q then return {stopped = false} end
+
+  local c = valid_companion(cid)
+  if c then
+    c.entity.shooting_state = {state = defines.shooting.not_shooting}
+    c.entity.walking_state = {walking = false}
   end
-  return {stopped = false}
+
+  storage.combat_queues[cid] = nil
+  return {stopped = true}
 end
 
 return M
