@@ -16,7 +16,7 @@ export class FactorioMCPServer {
     this.server = new Server(
       {
         name: "factorio-companion",
-        version: "0.1.0",
+        version: "0.2.1",
       },
       {
         capabilities: {
@@ -35,7 +35,7 @@ export class FactorioMCPServer {
         {
           name: "get_companion_messages",
           description:
-            "Get unread messages from Factorio chat starting with /companion. Returns array of {player, message, tick}.",
+            "Get unread messages from Factorio chat. Returns array of {player, message, tick}.",
           inputSchema: {
             type: "object",
             properties: {},
@@ -44,7 +44,7 @@ export class FactorioMCPServer {
         {
           name: "send_companion_message",
           description:
-            "Send a message to Factorio chat as AI Companion. The message will appear in green text for all players.",
+            "Send a message to Factorio chat as Claude. Appears in green text.",
           inputSchema: {
             type: "object",
             properties: {
@@ -108,7 +108,7 @@ export class FactorioMCPServer {
               {
                 type: "text",
                 text: response.success
-                  ? "Message sent successfully to Factorio chat"
+                  ? "Message sent"
                   : `Error: ${response.error}`,
               },
             ],
@@ -129,23 +129,18 @@ export class FactorioMCPServer {
         const messages = JSON.parse(response.data || "[]");
 
         if (Array.isArray(messages) && messages.length > 0) {
-          // Send notification to client about new messages
-          messages.forEach((msg: any) => {
+          messages.forEach((msg: { player: string; message: string; tick: number }) => {
             this.server.notification({
               method: "notifications/message",
               params: {
                 level: "info",
                 logger: "factorio-companion",
-                data: {
-                  player: msg.player,
-                  message: msg.message,
-                  tick: msg.tick,
-                },
+                data: msg,
               },
             });
           });
 
-          console.error(`📬 Sent ${messages.length} message notification(s)`);
+          console.error(`Sent ${messages.length} notification(s)`);
         }
       }
     } catch (error) {
@@ -154,7 +149,7 @@ export class FactorioMCPServer {
   }
 
   private startPolling() {
-    console.error("🔄 Starting message polling (every 3 seconds)...");
+    console.error("Starting message polling (every 3 seconds)...");
 
     this.pollingInterval = setInterval(async () => {
       await this.checkForMessages();
@@ -162,18 +157,14 @@ export class FactorioMCPServer {
   }
 
   async start() {
-    console.error("🚀 Starting Factorio MCP Server...");
+    console.error("Starting Factorio MCP Server...");
     await this.rcon.connect();
-    console.error("📡 RCON connected to Factorio");
+    console.error("RCON connected");
 
     const transport = new StdioServerTransport();
     await this.server.connect(transport);
-    console.error("✅ MCP server running on stdio");
-    console.error("\n💡 Server is ready! Claude Code can now use:");
-    console.error("   - get_companion_messages");
-    console.error("   - send_companion_message\n");
+    console.error("MCP server running on stdio");
 
-    // Start polling for messages
     this.startPolling();
   }
 

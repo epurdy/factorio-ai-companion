@@ -1,18 +1,14 @@
 /**
  * Reactive Message Checker
- *
  * Polls RCON until a message is found, then prints it and exits.
  * Designed to be used with TaskOutput blocking for reactive pattern.
- *
  * Usage: bun run src/reactive.ts
- *
- * Output format (JSON on last line):
- * {"player":"name","message":"text","tick":123}
+ * Output: JSON per message on stdout
  */
 
 import { RCONClient } from './rcon/client';
 
-const POLL_INTERVAL = 1000; // 1 second for faster response
+const POLL_INTERVAL = 1000;
 
 const client = new RCONClient({
   host: process.env.FACTORIO_HOST || '127.0.0.1',
@@ -32,12 +28,10 @@ async function waitForMessage(): Promise<void> {
         const messages = JSON.parse(response.data || '[]');
 
         if (Array.isArray(messages) && messages.length > 0) {
-          // Output each message as JSON (stdout for parsing)
           messages.forEach((msg: { player: string; message: string; tick: number }) => {
             console.log(JSON.stringify(msg));
           });
 
-          // Exit successfully - message found
           await client.disconnect();
           process.exit(0);
         }
