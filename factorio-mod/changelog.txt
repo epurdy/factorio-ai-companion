@@ -1,0 +1,31 @@
+---------------------------------------------------------------------------------------------------
+Version: 0.13.0
+Date: 2025-01-17
+  Features:
+    - Added centralized configuration system
+    - Added safe_command wrapper to reduce boilerplate
+  Changes:
+    - All messages translated to English
+    - Improved code organization and DRY principles
+  Bugfixes:
+    - Fixed connection retry logic duplication
+---------------------------------------------------------------------------------------------------
+Version: 0.12.3
+Date: 2025-01-16
+  Features:
+    - Hybrid mining system with native Factorio API + auto-restart
+    - Reduced wololo range from 200 to 25 tiles for balance
+---------------------------------------------------------------------------------------------------
+Version: 0.12.0
+Date: 2025-01-15
+  Features:
+    - Added companion map markers
+    - Added 51 RCON commands for AI control
+    - Added autonomous mining skill
+---------------------------------------------------------------------------------------------------
+Version: 0.1.0
+Date: 2025-01-10
+  Features:
+    - Initial release
+    - Basic companion spawning and control
+    - RCON integration
