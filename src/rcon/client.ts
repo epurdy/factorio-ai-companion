@@ -103,27 +103,44 @@ export class RCONClient {
         return resolve({ success: false, data: "", error: "Socket not initialized" });
       }
 
+      let resolved = false;
+      const cleanup = () => {
+        if (this.socket) {
+          this.socket.removeListener("data", onData);
+          this.socket.removeListener("error", onError);
+        }
+        clearTimeout(timeout);
+      };
+
+      const finish = (result: RCONResponse) => {
+        if (!resolved) {
+          resolved = true;
+          cleanup();
+          resolve(result);
+        }
+      };
+
       const timeout = setTimeout(() => {
-        resolve({
+        finish({
           success: false,
           data: "",
           error: `Command timeout after ${timeoutMs || this.commandTimeout}ms`,
         });
       }, timeoutMs || this.commandTimeout);
 
-      this.socket.write(packet);
-
-      this.socket.once("data", (data) => {
-        clearTimeout(timeout);
+      const onData = (data: Buffer) => {
         const response = this.parsePacket(data);
-        resolve({ success: true, data: response.payload });
-      });
+        finish({ success: true, data: response.payload });
+      };
 
-      this.socket.once("error", (err) => {
-        clearTimeout(timeout);
+      const onError = (err: Error) => {
         this.connected = false;
-        resolve({ success: false, data: "", error: err.message });
-      });
+        finish({ success: false, data: "", error: err.message });
+      };
+
+      this.socket.once("data", onData);
+      this.socket.once("error", onError);
+      this.socket.write(packet);
     });
   }
 
