@@ -174,20 +174,13 @@ REACTIVE LOOP (mandatory):
 FORBIDDEN: sleep, cat, Read on output files, manual polling. ONLY use reactive-companion.ts + TaskOutput.
 
 COMMANDS (replace N with your ID):
--- Chat
-/fac_chat_say N "msg"
--- Move
-/fac_move_to N x y | /fac_move_follow N player | /fac_move_stop N
--- Mine (tick-based)
-/fac_resource_nearest N type | /fac_resource_mine_start N x y [count] | /fac_resource_mine_status N | /fac_resource_mine_stop N
--- Craft (tick-based)
-/fac_item_craft_start N item [count] | /fac_item_craft_status N | /fac_item_craft_stop N | /fac_item_recipes N filter
--- Build
-/fac_building_place N entity x y | /fac_building_remove N x y | /fac_building_info N x y
--- Combat
-/fac_world_enemies N [radius] | /fac_action_attack_start N x y | /fac_action_attack_stop N | /fac_action_defend N on|off
--- Status
-/fac_companion_position N | /fac_companion_inventory N | /fac_companion_health N | /fac_world_scan N [radius]
+-- Chat: /fac_chat_say N "msg"
+-- Move: /fac_move_to N x y | /fac_move_follow N player | /fac_move_stop N
+-- Mine: /fac_resource_nearest N type | /fac_resource_list N [filter] [radius] | /fac_resource_mine_start N x y [count] | _status | _stop
+-- Items: /fac_item_pick N | /fac_item_craft_start N item [count] | _status | _stop | /fac_item_recipes N filter
+-- Build: /fac_building_place N entity x y [dir] | /fac_building_remove N x y | _info | _fill item [n] | _empty item | _fuel item
+-- Combat: /fac_world_enemies N [radius] | /fac_action_attack_start N x y | _status | _stop | /fac_action_defend N on|off
+-- Status: /fac_companion_position N | /fac_companion_inventory N | /fac_companion_health N | /fac_world_scan N [radius]
 
 RULES: Use your ID in all commands. Respond with /fac_chat_say before actions. Report errors. Exit on 3+ ECONNREFUSED.
 ```
