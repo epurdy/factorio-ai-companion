@@ -2,7 +2,7 @@
 local u = require("commands.init")
 
 commands.add_command("fac_move_to", nil, function(cmd)
-  local ok, err = pcall(function()
+  u.safe_command(function()
     local args = u.parse_args("^(%S+)%s+([%d.-]+)%s+([%d.-]+)$", cmd.parameter)
     local id = u.find_companion(args[1])
     if not id then u.error_response("Companion not found"); return end
@@ -11,11 +11,10 @@ commands.add_command("fac_move_to", nil, function(cmd)
     storage.walking_queues[id] = {target = {x = x, y = y}}
     u.json_response({id = id, walking_to = {x = x, y = y}})
   end)
-  if not ok then u.error_response(err) end
 end)
 
 commands.add_command("fac_move_follow", nil, function(cmd)
-  local ok, err = pcall(function()
+  u.safe_command(function()
     local args = u.parse_args("^(%S+)%s+(.+)$", cmd.parameter)
     local id = u.find_companion(args[1])
     if not id then u.error_response("Companion not found"); return end
@@ -24,16 +23,14 @@ commands.add_command("fac_move_follow", nil, function(cmd)
     storage.walking_queues[id] = {follow_player = pname}
     u.json_response({id = id, following = pname})
   end)
-  if not ok then u.error_response(err) end
 end)
 
 commands.add_command("fac_move_stop", nil, function(cmd)
-  local ok, err = pcall(function()
+  u.safe_command(function()
     local id, c = u.find_companion(cmd.parameter)
     if not id then u.error_response("Companion not found"); return end
     storage.walking_queues[id] = nil
     c.entity.walking_state = {walking = false}
     u.json_response({id = id, stopped = true})
   end)
-  if not ok then u.error_response(err) end
 end)

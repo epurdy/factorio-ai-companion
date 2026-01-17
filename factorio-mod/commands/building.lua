@@ -3,7 +3,7 @@ local u = require("commands.init")
 local queues = require("commands.queues")
 
 commands.add_command("fac_building_can_place", nil, function(cmd)
-  local ok, err = pcall(function()
+  u.safe_command(function()
     local args = u.parse_args("^(%S+)%s+(%S+)%s+([%d.-]+)%s+([%d.-]+)%s*(%d*)$", cmd.parameter)
     local id, c = u.find_companion(args[1])
     if not id then u.error_response("Companion not found"); return end
@@ -17,11 +17,10 @@ commands.add_command("fac_building_can_place", nil, function(cmd)
     local can = c.entity.surface.can_place_entity{name = name, position = {x=x, y=y}, direction = dir, force = c.entity.force}
     u.json_response({id = id, can_place = can, entity = name})
   end)
-  if not ok then u.error_response(err) end
 end)
 
 commands.add_command("fac_building_place", nil, function(cmd)
-  local ok, err = pcall(function()
+  u.safe_command(function()
     local args = u.parse_args("^(%S+)%s+(%S+)%s+([%d.-]+)%s+([%d.-]+)%s*(%d*)$", cmd.parameter)
     local id, c = u.find_companion(args[1])
     if not id then u.error_response("Companion not found"); return end
@@ -40,11 +39,10 @@ commands.add_command("fac_building_place", nil, function(cmd)
     if e then inv.remove{name = name, count = 1}; u.json_response({id = id, placed = true, entity = name})
     else u.json_response({id = id, error = "Failed"}) end
   end)
-  if not ok then u.error_response(err) end
 end)
 
 commands.add_command("fac_building_remove", nil, function(cmd)
-  local ok, err = pcall(function()
+  u.safe_command(function()
     local args = u.parse_args("^(%S+)%s+(%S+)%s+([%d.-]+)%s+([%d.-]+)$", cmd.parameter)
     local id, c = u.find_companion(args[1])
     if not id then u.error_response("Companion not found"); return end
@@ -59,11 +57,10 @@ commands.add_command("fac_building_remove", nil, function(cmd)
       u.json_response({id = id, removed = true, entity = name})
     else u.json_response({id = id, error = "Cannot remove"}) end
   end)
-  if not ok then u.error_response(err) end
 end)
 
 commands.add_command("fac_building_rotate", nil, function(cmd)
-  local ok, err = pcall(function()
+  u.safe_command(function()
     local args = u.parse_args("^(%S+)%s+([%d.-]+)%s+([%d.-]+)%s+(%d)$", cmd.parameter)
     local id, c = u.find_companion(args[1])
     if not id then u.error_response("Companion not found"); return end
@@ -76,11 +73,10 @@ commands.add_command("fac_building_rotate", nil, function(cmd)
     t.direction = u.dir_map[dir] or defines.direction.north
     u.json_response({id = id, rotated = t.name, direction = dir})
   end)
-  if not ok then u.error_response(err) end
 end)
 
 commands.add_command("fac_building_info", nil, function(cmd)
-  local ok, err = pcall(function()
+  u.safe_command(function()
     local args = u.parse_args("^(%S+)%s+(%S+)%s+([%d.-]+)%s+([%d.-]+)$", cmd.parameter)
     local id, c = u.find_companion(args[1])
     if not id then u.error_response("Companion not found"); return end
@@ -96,11 +92,10 @@ commands.add_command("fac_building_info", nil, function(cmd)
     if t.get_recipe then local r = t.get_recipe(); if r then info.recipe = r.name end end
     u.json_response({id = id, entity = info})
   end)
-  if not ok then u.error_response(err) end
 end)
 
 commands.add_command("fac_building_recipe", nil, function(cmd)
-  local ok, err = pcall(function()
+  u.safe_command(function()
     local args = u.parse_args("^(%S+)%s+(%S+)%s+([%d.-]+)%s+([%d.-]+)$", cmd.parameter)
     local id, c = u.find_companion(args[1])
     if not id then u.error_response("Companion not found"); return end
@@ -112,11 +107,10 @@ commands.add_command("fac_building_recipe", nil, function(cmd)
     es[1].set_recipe(recipe)
     u.json_response({id = id, set_recipe = true, recipe = recipe})
   end)
-  if not ok then u.error_response(err) end
 end)
 
 commands.add_command("fac_building_fuel", nil, function(cmd)
-  local ok, err = pcall(function()
+  u.safe_command(function()
     local args = u.parse_args("^(%S+)%s+(%S+)%s*(%d*)$", cmd.parameter)
     local id, c = u.find_companion(args[1])
     if not id then u.error_response("Companion not found"); return end
@@ -132,11 +126,10 @@ commands.add_command("fac_building_fuel", nil, function(cmd)
     if ins > 0 then inv.remove{name = fuel, count = ins}; u.json_response({id = id, inserted = ins, fuel = fuel})
     else u.json_response({id = id, error = "Full"}) end
   end)
-  if not ok then u.error_response(err) end
 end)
 
 commands.add_command("fac_building_empty", nil, function(cmd)
-  local ok, err = pcall(function()
+  u.safe_command(function()
     local args = u.parse_args("^(%S+)%s+(%S+)%s*(%d*)%s*([%d.-]*)%s*([%d.-]*)$", cmd.parameter)
     local id, c = u.find_companion(args[1])
     if not id then u.error_response("Companion not found"); return end
@@ -161,11 +154,10 @@ commands.add_command("fac_building_empty", nil, function(cmd)
     end
     u.json_response({id = id, extracted = ext, item = item})
   end)
-  if not ok then u.error_response(err) end
 end)
 
 commands.add_command("fac_building_fill", nil, function(cmd)
-  local ok, err = pcall(function()
+  u.safe_command(function()
     local args = u.parse_args("^(%S+)%s+(%S+)%s*(%d*)%s*([%d.-]*)%s*([%d.-]*)$", cmd.parameter)
     local id, c = u.find_companion(args[1])
     if not id then u.error_response("Companion not found"); return end
@@ -186,12 +178,11 @@ commands.add_command("fac_building_fill", nil, function(cmd)
     if ins > 0 then u.json_response({id = id, inserted = ins, item = item})
     else u.json_response({id = id, error = "Could not insert"}) end
   end)
-  if not ok then u.error_response(err) end
 end)
 
 -- Realistic tick-based building placement
 commands.add_command("fac_building_place_start", nil, function(cmd)
-  local ok, err = pcall(function()
+  u.safe_command(function()
     local args = u.parse_args("^(%S+)%s+(%S+)%s+(%-?%d+%.?%d*)%s+(%-?%d+%.?%d*)%s*(%S*)$", cmd.parameter)
     local id, c = u.find_companion(args[1])
     if not id then u.error_response("Companion not found"); return end
@@ -202,16 +193,14 @@ commands.add_command("fac_building_place_start", nil, function(cmd)
     result.id = id
     u.json_response(result)
   end)
-  if not ok then u.error_response(err) end
 end)
 
 commands.add_command("fac_building_place_status", nil, function(cmd)
-  local ok, err = pcall(function()
+  u.safe_command(function()
     local args = u.parse_args("^(%S+)$", cmd.parameter)
     local id = u.find_companion(args[1])
     if not id then u.error_response("Companion not found"); return end
     local status = queues.get_build_status(id)
     u.json_response({id = id, status = status})
   end)
-  if not ok then u.error_response(err) end
 end)

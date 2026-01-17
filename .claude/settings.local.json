@@ -1,6 +1,12 @@
 {
+  "permissions": {
+    "allow": [
+      "Bash(tasklist:*)",
+      "Bash(findstr:*)"
+    ]
+  },
+  "enableAllProjectMcpServers": true,
   "enabledMcpjsonServers": [
     "factorio-companion"
-  ],
-  "enableAllProjectMcpServers": true
+  ]
 }

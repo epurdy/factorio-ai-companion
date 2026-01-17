@@ -2,12 +2,17 @@
 local u = require("commands.init")
 
 commands.add_command("fac_action_attack", nil, function(cmd)
-  local ok, err = pcall(function()
+  u.safe_command(function()
     local args = u.parse_args("^(%S+)%s+([%d.-]+)%s+([%d.-]+)$", cmd.parameter)
     local id, c = u.find_companion(args[1])
     if not id then u.error_response("Companion not found"); return end
     local x, y = tonumber(args[2]), tonumber(args[3])
     if not x or not y then u.error_response("Invalid coordinates"); return end
+
+    -- STOP WALKING - Clear walking queue so attack can take priority
+    storage.walking_queues[id] = nil
+    c.entity.walking_state = {walking = false}
+
     local target_pos = {x = x, y = y}
     local targets = c.entity.surface.find_entities_filtered{position = target_pos, radius = 2, limit = 1}
     local t = targets[1]
@@ -19,11 +24,10 @@ commands.add_command("fac_action_attack", nil, function(cmd)
       u.json_response({id = id, attacking = true, target = "ground", position = target_pos})
     end
   end)
-  if not ok then u.error_response(err) end
 end)
 
 commands.add_command("fac_action_flee", nil, function(cmd)
-  local ok, err = pcall(function()
+  u.safe_command(function()
     local args = u.parse_args("^(%S+)%s*(%d*)$", cmd.parameter)
     local id, c = u.find_companion(args[1])
     if not id then u.error_response("Companion not found"); return end
@@ -41,20 +45,18 @@ commands.add_command("fac_action_flee", nil, function(cmd)
     storage.walking_queues[id] = {target = flee_pos}
     u.json_response({id = id, fleeing = true, enemies = #enemies, to = flee_pos})
   end)
-  if not ok then u.error_response(err) end
 end)
 
 commands.add_command("fac_action_patrol", nil, function(cmd)
-  local ok, err = pcall(function()
+  u.safe_command(function()
     local id = u.find_companion(cmd.parameter)
     if not id then u.error_response("Companion not found"); return end
     u.json_response({id = id, error = "Not implemented"})
   end)
-  if not ok then u.error_response(err) end
 end)
 
 commands.add_command("fac_action_wololo", nil, function(cmd)
-  local ok, err = pcall(function()
+  u.safe_command(function()
     local id, c = u.find_companion(cmd.parameter)
     if not id then u.error_response("Companion not found"); return end
     local pos, surf, force = c.entity.position, c.entity.surface, c.entity.force
@@ -68,5 +70,4 @@ commands.add_command("fac_action_wololo", nil, function(cmd)
     t.force = force
     u.json_response({id = id, wololo = true, converted = t.name, from = old})
   end)
-  if not ok then u.error_response(err) end
 end)

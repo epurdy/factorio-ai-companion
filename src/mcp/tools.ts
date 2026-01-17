@@ -429,6 +429,15 @@ export const SKILLS: Record<string, {
 // Special tools that need TS-side handling (not just RCON passthrough)
 const SPECIAL_TOOLS = [
   {
+    name: "session_status",
+    description: "Get current session state and instructions. Call this FIRST to understand what's running and how to start the reactive loop.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {},
+      required: []
+    }
+  },
+  {
     name: "companion_status",
     description: "Get status of ONE companion including running skill (combines Lua position + TS skill tracking).",
     inputSchema: {

@@ -1,39 +1,14 @@
-/**
- * Reactive All-Companions Message Checker
- * Polls RCON for ALL messages (orchestrator + all companions)
- * Exits with JSON array when messages are found
- * Usage: bun run src/reactive-all.ts
- * Output: JSON array of {companionId, player, message, tick}
- */
-
 import { RCONClient } from './rcon/client';
+import { getRCONConfig } from './config';
+import { connectWithRetry, sleep } from './utils/connection';
 
-const POLL_INTERVAL = 100; // 100ms polling (can add exponential backoff later)
-const MAX_RETRIES = 5;
+const POLL_INTERVAL = 100;
 
-const client = new RCONClient({
-  host: process.env.FACTORIO_HOST || '127.0.0.1',
-  port: parseInt(process.env.FACTORIO_RCON_PORT || '34198'),
-  password: process.env.FACTORIO_RCON_PASSWORD || 'factorio'
-});
-
-async function connectWithRetry(): Promise<void> {
-  for (let i = 0; i < MAX_RETRIES; i++) {
-    try {
-      await client.connect();
-      console.error('✅ Connected to RCON');
-      return;
-    } catch (e) {
-      console.error(`Connection attempt ${i + 1}/${MAX_RETRIES} failed...`);
-      await new Promise(r => setTimeout(r, 2000));
-    }
-  }
-  throw new Error('Failed to connect to RCON');
-}
+const client = new RCONClient(getRCONConfig());
 
 async function pollAllMessages(): Promise<void> {
   try {
-    await connectWithRetry();
+    await connectWithRetry(client);
     console.error('Polling for messages (all companions)...');
 
     while (true) {
@@ -63,7 +38,7 @@ async function pollAllMessages(): Promise<void> {
         }
       }
 
-      await new Promise(r => setTimeout(r, POLL_INTERVAL));
+      await sleep(POLL_INTERVAL);
     }
   } catch (error) {
     console.error('Fatal error:', error);

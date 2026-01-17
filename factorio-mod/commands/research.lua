@@ -2,7 +2,7 @@
 local u = require("commands.init")
 
 commands.add_command("fac_research_get", nil, function(cmd)
-  local ok, err = pcall(function()
+  u.safe_command(function()
     local id, c = u.find_companion(cmd.parameter)
     if not id then u.error_response("Companion not found"); return end
     local force = c.entity.force
@@ -23,11 +23,10 @@ commands.add_command("fac_research_get", nil, function(cmd)
     if #available > 30 then local t = {}; for i = 1, 30 do t[i] = available[i] end; available = t end
     u.json_response({id = id, current = current, available = available, count = #available})
   end)
-  if not ok then u.error_response(err) end
 end)
 
 commands.add_command("fac_research_progress", nil, function(cmd)
-  local ok, err = pcall(function()
+  u.safe_command(function()
     local args = u.parse_args("^(%S+)%s*(%S*)$", cmd.parameter)
     local id, c = u.find_companion(args[1])
     if not id then u.error_response("Companion not found"); return end
@@ -41,11 +40,10 @@ commands.add_command("fac_research_progress", nil, function(cmd)
     local prog = is_cur and force.research_progress or 0
     u.json_response({id = id, tech = tech_name, progress = prog, remaining = math.ceil(tech.research_unit_count * (1 - prog))})
   end)
-  if not ok then u.error_response(err) end
 end)
 
 commands.add_command("fac_research_set", nil, function(cmd)
-  local ok, err = pcall(function()
+  u.safe_command(function()
     local args = u.parse_args("^(%S+)%s+(%S+)$", cmd.parameter)
     local id, c = u.find_companion(args[1])
     if not id then u.error_response("Companion not found"); return end
@@ -57,5 +55,4 @@ commands.add_command("fac_research_set", nil, function(cmd)
     if force.add_research(args[2]) then u.json_response({id = id, researching = args[2]})
     else u.json_response({id = id, error = "Failed"}) end
   end)
-  if not ok then u.error_response(err) end
 end)

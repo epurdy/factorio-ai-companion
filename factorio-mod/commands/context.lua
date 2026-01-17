@@ -2,7 +2,7 @@
 local u = require("commands.init")
 
 commands.add_command("fac_context_clear", nil, function(cmd)
-  local ok, err = pcall(function()
+  u.safe_command(function()
     local param = cmd.parameter or "all"
     storage.context_clear_requests = storage.context_clear_requests or {}
     if param == "all" then
@@ -26,16 +26,14 @@ commands.add_command("fac_context_clear", nil, function(cmd)
       u.json_response({cleared = id, messages = count})
     end
   end)
-  if not ok then u.error_response(err) end
 end)
 
 commands.add_command("fac_context_check", nil, function(cmd)
-  local ok, err = pcall(function()
+  u.safe_command(function()
     storage.context_clear_requests = storage.context_clear_requests or {}
     local pending = {}
     for id, tick in pairs(storage.context_clear_requests) do pending[#pending + 1] = {id = id, tick = tick} end
     storage.context_clear_requests = {}
     u.json_response({pending = pending, count = #pending})
   end)
-  if not ok then u.error_response(err) end
 end)

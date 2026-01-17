@@ -4,7 +4,7 @@ local queues = require("commands.queues")
 
 -- Detect nearby enemies
 commands.add_command("fac_world_enemies", nil, function(cmd)
-  local ok, err = pcall(function()
+  u.safe_command(function()
     local args = u.parse_args("^(%S+)%s*(%d*)$", cmd.parameter)
     local id, c = u.find_companion(args[1])
     if not id then u.error_response("Companion not found"); return end
@@ -40,12 +40,11 @@ commands.add_command("fac_world_enemies", nil, function(cmd)
 
     u.json_response({id = id, enemies = result, count = #result, threat_level = threat})
   end)
-  if not ok then u.error_response(err) end
 end)
 
 -- Start attacking enemies at position
 commands.add_command("fac_action_attack_start", nil, function(cmd)
-  local ok, err = pcall(function()
+  u.safe_command(function()
     local args = u.parse_args("^(%S+)%s+(%-?%d+%.?%d*)%s+(%-?%d+%.?%d*)$", cmd.parameter)
     local id, c = u.find_companion(args[1])
     if not id then u.error_response("Companion not found"); return end
@@ -54,36 +53,33 @@ commands.add_command("fac_action_attack_start", nil, function(cmd)
     result.id = id
     u.json_response(result)
   end)
-  if not ok then u.error_response(err) end
 end)
 
 -- Check combat status
 commands.add_command("fac_action_attack_status", nil, function(cmd)
-  local ok, err = pcall(function()
+  u.safe_command(function()
     local args = u.parse_args("^(%S+)$", cmd.parameter)
     local id = u.find_companion(args[1])
     if not id then u.error_response("Companion not found"); return end
     local status = queues.get_combat_status(id)
     u.json_response({id = id, status = status})
   end)
-  if not ok then u.error_response(err) end
 end)
 
 -- Stop attacking
 commands.add_command("fac_action_attack_stop", nil, function(cmd)
-  local ok, err = pcall(function()
+  u.safe_command(function()
     local args = u.parse_args("^(%S+)$", cmd.parameter)
     local id = u.find_companion(args[1])
     if not id then u.error_response("Companion not found"); return end
     local result = queues.stop_combat(id)
     u.json_response({id = id, stopped = result.stopped, kills = result.kills or 0})
   end)
-  if not ok then u.error_response(err) end
 end)
 
 -- Toggle auto-defend mode
 commands.add_command("fac_action_defend", nil, function(cmd)
-  local ok, err = pcall(function()
+  u.safe_command(function()
     local args = u.parse_args("^(%S+)%s+(%S+)$", cmd.parameter)
     local id, c = u.find_companion(args[1])
     if not id then u.error_response("Companion not found"); return end
@@ -96,5 +92,4 @@ commands.add_command("fac_action_defend", nil, function(cmd)
       u.json_response({id = id, auto_defend = false})
     end
   end)
-  if not ok then u.error_response(err) end
 end)

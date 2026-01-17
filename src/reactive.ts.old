@@ -7,31 +7,16 @@
  */
 
 import { RCONClient } from './rcon/client';
+import { getRCONConfig } from './config';
+import { connectWithRetry, sleep } from './utils/connection';
 
 const POLL_INTERVAL = 1000;
 
-const client = new RCONClient({
-  host: process.env.FACTORIO_HOST || '127.0.0.1',
-  port: parseInt(process.env.FACTORIO_RCON_PORT || '34198'),
-  password: process.env.FACTORIO_RCON_PASSWORD || 'factorio'
-});
-
-async function connectWithRetry(maxAttempts = 30): Promise<void> {
-  for (let i = 0; i < maxAttempts; i++) {
-    try {
-      await client.connect();
-      return;
-    } catch {
-      console.error(`Connection attempt ${i + 1}/${maxAttempts} failed, retrying in 5s...`);
-      await new Promise(r => setTimeout(r, 5000));
-    }
-  }
-  throw new Error(`Failed to connect after ${maxAttempts} attempts`);
-}
+const client = new RCONClient(getRCONConfig());
 
 async function waitForMessage(): Promise<void> {
   try {
-    await connectWithRetry();
+    await connectWithRetry(client, 30, 5000);
     console.error('Connected. Waiting for message...');
 
     while (true) {
@@ -51,7 +36,7 @@ async function waitForMessage(): Promise<void> {
         }
       }
 
-      await new Promise(r => setTimeout(r, POLL_INTERVAL));
+      await sleep(POLL_INTERVAL);
     }
   } catch (error) {
     console.error('Error:', error);

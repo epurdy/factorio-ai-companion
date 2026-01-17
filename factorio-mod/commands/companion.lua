@@ -2,7 +2,7 @@
 local u = require("commands.init")
 
 commands.add_command("fac_companion_list", nil, function(cmd)
-  local ok, err = pcall(function()
+  u.safe_command(function()
     local list = {}
     for id, c in pairs(storage.companions) do
       if c.entity and c.entity.valid then
@@ -18,11 +18,10 @@ commands.add_command("fac_companion_list", nil, function(cmd)
     table.sort(list, function(a, b) return a.id < b.id end)
     u.json_response({companions = list, count = #list})
   end)
-  if not ok then u.error_response(err) end
 end)
 
 commands.add_command("fac_companion_spawn", nil, function(cmd)
-  local ok, err = pcall(function()
+  u.safe_command(function()
     local param = cmd.parameter or ""
     local req_id = tonumber(param:match("id=(%d+)"))
     if req_id and storage.companions[req_id] then
@@ -43,11 +42,10 @@ commands.add_command("fac_companion_spawn", nil, function(cmd)
       u.json_response({spawned = true, id = id})
     else u.error_response("Failed to spawn") end
   end)
-  if not ok then u.error_response(err) end
 end)
 
 commands.add_command("fac_companion_disappear", nil, function(cmd)
-  local ok, err = pcall(function()
+  u.safe_command(function()
     local id, c = u.find_companion(cmd.parameter)
     if not id then u.error_response("Companion not found"); return end
     local pos, surf = c.entity.position, c.entity.surface
@@ -60,7 +58,6 @@ commands.add_command("fac_companion_disappear", nil, function(cmd)
       end
     end
     if c.label and c.label.valid then c.label.destroy() end
-    -- Remove map marker
     if storage.companion_markers and storage.companion_markers[id] then
       if storage.companion_markers[id].valid then storage.companion_markers[id].destroy() end
       storage.companion_markers[id] = nil
@@ -72,11 +69,10 @@ commands.add_command("fac_companion_disappear", nil, function(cmd)
     game.print("[#" .. id .. " gone]", u.print_color(u.COLORS.system))
     u.json_response({id = id, disappeared = true, dropped = dropped})
   end)
-  if not ok then u.error_response(err) end
 end)
 
 commands.add_command("fac_companion_position", nil, function(cmd)
-  local ok, err = pcall(function()
+  u.safe_command(function()
     local id, c = u.find_companion(cmd.parameter)
     if not id then u.error_response("Companion not found"); return end
     local pos, surf = c.entity.position, c.entity.surface
@@ -92,11 +88,10 @@ commands.add_command("fac_companion_position", nil, function(cmd)
     end
     u.json_response({id = id, position = {x = math.floor(pos.x * 10) / 10, y = math.floor(pos.y * 10) / 10}, nearby = summary, players = players})
   end)
-  if not ok then u.error_response(err) end
 end)
 
 commands.add_command("fac_companion_health", nil, function(cmd)
-  local ok, err = pcall(function()
+  u.safe_command(function()
     local args = u.parse_args("^(%S+)%s*(%S*)$", cmd.parameter)
     local id, c = u.find_companion(args[1])
     if not id then u.error_response("Companion not found"); return end
@@ -117,11 +112,10 @@ commands.add_command("fac_companion_health", nil, function(cmd)
     end
     u.json_response(r)
   end)
-  if not ok then u.error_response(err) end
 end)
 
 commands.add_command("fac_companion_inventory", nil, function(cmd)
-  local ok, err = pcall(function()
+  u.safe_command(function()
     local args = u.parse_args("^(%S+)%s*([%d.-]*)%s*([%d.-]*)$", cmd.parameter)
     local id, c = u.find_companion(args[1])
     if not id then u.error_response("Companion not found"); return end
@@ -148,5 +142,4 @@ commands.add_command("fac_companion_inventory", nil, function(cmd)
       u.json_response({id = id, items = items, slots = #inv, used = #items})
     end
   end)
-  if not ok then u.error_response(err) end
 end)

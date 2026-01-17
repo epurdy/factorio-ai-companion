@@ -1,45 +1,12 @@
-/**
- * Factorio AI Companion Daemon
- * Continuous polling daemon for message monitoring.
- * Usage: bun run src/daemon.ts
- */
-
 import { RCONClient } from './rcon/client';
+import { getRCONConfig } from './config';
+import { connectWithRetry, sleep } from './utils/connection';
 
 const POLL_INTERVAL = 2000;
 
-const client = new RCONClient({
-  host: process.env.FACTORIO_HOST || '127.0.0.1',
-  port: parseInt(process.env.FACTORIO_RCON_PORT || '34198'),
-  password: process.env.FACTORIO_RCON_PASSWORD || 'factorio'
-});
+const client = new RCONClient(getRCONConfig());
 
 let connected = false;
-
-function sleep(ms: number): Promise<void> {
-  return new Promise(resolve => setTimeout(resolve, ms));
-}
-
-async function connectWithRetry(): Promise<boolean> {
-  const maxRetries = 5;
-
-  for (let attempt = 1; attempt <= maxRetries; attempt++) {
-    try {
-      console.log(`Connecting to RCON (attempt ${attempt}/${maxRetries})...`);
-      await client.connect();
-      console.log('Connected to Factorio RCON');
-      return true;
-    } catch (error) {
-      console.error(`Connection failed: ${error}`);
-      if (attempt < maxRetries) {
-        const delay = 2000 * attempt;
-        console.log(`Retrying in ${delay/1000}s...`);
-        await sleep(delay);
-      }
-    }
-  }
-  return false;
-}
 
 async function pollMessages(): Promise<void> {
   try {
@@ -78,8 +45,10 @@ async function main() {
   console.log(`Poll interval: ${POLL_INTERVAL/1000}s\n`);
 
   while (!connected) {
-    connected = await connectWithRetry();
-    if (!connected) {
+    try {
+      await connectWithRetry(client, 5);
+      connected = true;
+    } catch (error) {
       console.log('Factorio not available. Waiting 10s...');
       console.log('Start Factorio: Multiplayer > Host New Game');
       await sleep(10000);
@@ -91,8 +60,10 @@ async function main() {
   while (true) {
     if (!connected) {
       console.log('Reconnecting...');
-      connected = await connectWithRetry();
-      if (!connected) {
+      try {
+        await connectWithRetry(client, 5);
+        connected = true;
+      } catch (error) {
         console.log('Waiting 10s before retry...');
         await sleep(10000);
         continue;

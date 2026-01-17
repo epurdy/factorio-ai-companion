@@ -59,10 +59,10 @@ companion_spawn(companionId: 2)
 
 **Factorio config** (`%APPDATA%\Factorio\config\config.ini`):
 ```ini
-[network]
 local-rcon-socket=127.0.0.1:34198
 local-rcon-password=factorio
 ```
+(Should be in the file, not under a specific section)
 
 **Run:** Multiplayer → Host New Game (RCON only works in multiplayer)
 

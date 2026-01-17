@@ -1,7 +1,6 @@
-// Companion Agent - runs as background process for a specific companion
-// Usage: bun run src/companion-agent.ts <companion_id>
-
 import { RCONClient } from "./rcon/client";
+import { getRCONConfig } from "./config";
+import { connectWithRetry, sleep } from "./utils/connection";
 
 const POLL_INTERVAL = 1500;
 
@@ -11,11 +10,7 @@ if (!companionId || isNaN(companionId)) {
   process.exit(1);
 }
 
-const rcon = new RCONClient({
-  host: process.env.FACTORIO_HOST || "127.0.0.1",
-  port: parseInt(process.env.FACTORIO_RCON_PORT || "34198"),
-  password: process.env.FACTORIO_RCON_PASSWORD || "factorio",
-});
+const rcon = new RCONClient(getRCONConfig());
 
 async function getMessagesForMe(): Promise<
   Array<{ player: string; message: string; tick: number; target_companion?: number }>
@@ -46,7 +41,7 @@ async function pollLoop(): Promise<void> {
       console.log(JSON.stringify({ companionId, ...msg }));
     }
 
-    await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL));
+    await sleep(POLL_INTERVAL);
   }
 }
 

@@ -4,7 +4,7 @@ local u = require("commands.init")
 local normalize = {copper = "copper-ore", iron = "iron-ore", coal = "coal", stone = "stone", uranium = "uranium-ore"}
 
 commands.add_command("fac_world_nearest", nil, function(cmd)
-  local ok, err = pcall(function()
+  u.safe_command(function()
     local args = u.parse_args("^(%S+)%s+(%S+)$", cmd.parameter)
     local id, c = u.find_companion(args[1])
     if not id then u.error_response("Companion not found"); return end
@@ -28,11 +28,10 @@ commands.add_command("fac_world_nearest", nil, function(cmd)
     for _, e in ipairs(es) do local d = u.distance(e.position, pos); if d < min then min, closest = d, e end end
     u.json_response({id = id, nearest = closest.name, position = {x = math.floor(closest.position.x), y = math.floor(closest.position.y)}, distance = math.floor(min)})
   end)
-  if not ok then u.error_response(err) end
 end)
 
 commands.add_command("fac_world_scan", nil, function(cmd)
-  local ok, err = pcall(function()
+  u.safe_command(function()
     local args = u.parse_args("^(%S+)%s*(%d*)%s*(%S*)$", cmd.parameter)
     local id, c = u.find_companion(args[1])
     if not id then u.error_response("Companion not found"); return end
@@ -52,5 +51,4 @@ commands.add_command("fac_world_scan", nil, function(cmd)
     if #result > 50 then local t = {}; for i = 1, 50 do t[i] = result[i] end; result = t end
     u.json_response({id = id, entities = result, count = #result})
   end)
-  if not ok then u.error_response(err) end
 end)

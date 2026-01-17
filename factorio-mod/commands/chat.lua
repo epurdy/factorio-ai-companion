@@ -2,7 +2,7 @@
 local u = require("commands.init")
 
 commands.add_command("fac_chat_get", nil, function(cmd)
-  local ok, err = pcall(function()
+  u.safe_command(function()
     local filter = cmd.parameter
     local fid = tonumber(filter)
     local orch = filter == "orchestrator"
@@ -19,11 +19,10 @@ commands.add_command("fac_chat_get", nil, function(cmd)
     end
     u.json_response(msgs)
   end)
-  if not ok then u.error_response(err) end
 end)
 
 commands.add_command("fac_chat_say", nil, function(cmd)
-  local ok, err = pcall(function()
+  u.safe_command(function()
     local args = u.parse_args("^(%S+)%s+(.+)$", cmd.parameter)
     local id_str, msg = args[1], args[2]
     if not msg then u.error_response("Usage: fac_chat_say <id|0> <msg>"); return end
@@ -36,5 +35,4 @@ commands.add_command("fac_chat_say", nil, function(cmd)
     game.print("[" .. u.get_companion_display(id) .. "] " .. msg, u.print_color(c.color or u.get_companion_color(id)))
     u.json_response({id = id, name = c.name, said = msg})
   end)
-  if not ok then u.error_response(err) end
 end)

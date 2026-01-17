@@ -1,24 +1,12 @@
 #!/usr/bin/env bun
-/**
- * Mine Until - Autonomous mining script
- * Usage: bun run src/skills/mine-until.ts <companionId> <resource> <targetAmount>
- * Example: bun run src/skills/mine-until.ts 1 iron-ore 50
- *
- * Runs as a background process, handles the full mining cycle:
- * 1. Find nearest resource
- * 2. Walk to it if far
- * 3. Mine it
- * 4. Repeat until target amount reached
- * 5. Reports progress via chat
- */
-
 import { RCONClient } from "../rcon/client";
+import { getRCONConfig } from "../config";
+import { connectWithRetry, sleep } from "../utils/connection";
 
-const POLL_INTERVAL = 500; // 500ms polling
-const MINING_TIMEOUT = 30000; // 30s max wait for mining
-const WALKING_TIMEOUT = 60000; // 60s max wait for walking
+const POLL_INTERVAL = 500;
+const MINING_TIMEOUT = 30000;
+const WALKING_TIMEOUT = 60000;
 
-// Parse CLI arguments
 const companionId = parseInt(process.argv[2]);
 const resourceType = process.argv[3];
 const targetAmount = parseInt(process.argv[4]) || 50;
@@ -29,7 +17,6 @@ if (!companionId || !resourceType) {
   process.exit(1);
 }
 
-// Normalize resource names
 const normalize: Record<string, string> = {
   iron: "iron-ore",
   copper: "copper-ore",
@@ -39,11 +26,7 @@ const normalize: Record<string, string> = {
 };
 const resource = normalize[resourceType] || resourceType;
 
-const client = new RCONClient({
-  host: process.env.FACTORIO_HOST || "127.0.0.1",
-  port: parseInt(process.env.FACTORIO_RCON_PORT || "34198"),
-  password: process.env.FACTORIO_RCON_PASSWORD || "factorio"
-});
+const client = new RCONClient(getRCONConfig());
 
 async function say(msg: string): Promise<void> {
   await client.sendCommand(`/fac_chat_say ${companionId} "${msg}"`);
@@ -132,15 +115,12 @@ async function waitForMiningComplete(): Promise<number> {
   return lastStatus?.harvested || 0;
 }
 
-function sleep(ms: number): Promise<void> {
-  return new Promise(resolve => setTimeout(resolve, ms));
-}
 
 async function main(): Promise<void> {
   try {
     await client.connect();
     console.log(`[Companion #${companionId}] Starting mine-until: ${resource} x${targetAmount}`);
-    await say(`Empezando a minar ${resource} hasta tener ${targetAmount}...`);
+    await say(`Starting to mine ${resource} until I have ${targetAmount}...`);
 
     let totalMined = 0;
     let attempts = 0;
@@ -154,7 +134,7 @@ async function main(): Promise<void> {
       // Check current inventory
       const currentCount = await getInventoryCount(resource);
       if (currentCount >= targetAmount) {
-        await say(`Ya tengo ${currentCount} ${resource}!`);
+        await say(`I already have ${currentCount} ${resource}!`);
         break;
       }
 
@@ -174,7 +154,7 @@ async function main(): Promise<void> {
       }
 
       if (!nearest) {
-        await say(`No encuentro mas ${resource} cercano.`);
+        await say(`No more ${resource} found nearby.`);
         break;
       }
 
@@ -183,7 +163,7 @@ async function main(): Promise<void> {
 
       // Walk to resource if needed
       if (nearest.distance > 5) {
-        await say(`Caminando hacia ${resource} (${Math.floor(nearest.distance)} tiles)...`);
+        await say(`Walking to ${resource} (${Math.floor(nearest.distance)} tiles)...`);
         const arrived = await walkTo(nearest.position.x, nearest.position.y);
         if (!arrived) {
           console.log(`[#${companionId}] Failed to reach resource, marking as visited`);
@@ -214,7 +194,7 @@ async function main(): Promise<void> {
           console.log(`[#${companionId}] Stuck at spot, marking as visited and moving on`);
           visitedSpots.add(spotKey);
           consecutiveZeroMines = 0;
-          await say(`Spot agotado, buscando otro...`);
+          await say(`Spot depleted, looking for another...`);
         }
       } else {
         consecutiveZeroMines = 0;
@@ -226,13 +206,13 @@ async function main(): Promise<void> {
 
     // Final report
     const finalCount = await getInventoryCount(resource);
-    await say(`Terminado! Tengo ${finalCount} ${resource} en inventario.`);
+    await say(`Done! I have ${finalCount} ${resource} in inventory.`);
     console.log(`[#${companionId}] Done. Inventory: ${finalCount} ${resource}`);
 
   } catch (error) {
     console.error(`[#${companionId}] Error:`, error);
     try {
-      await say(`Error durante el minado: ${error}`);
+      await say(`Error during mining: ${error}`);
     } catch {}
   } finally {
     await client.disconnect();

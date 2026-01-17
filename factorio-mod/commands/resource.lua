@@ -5,7 +5,7 @@ local queues = require("commands.queues")
 local normalize = {copper = "copper-ore", iron = "iron-ore", coal = "coal", stone = "stone", uranium = "uranium-ore", oil = "crude-oil"}
 
 commands.add_command("fac_resource_list", nil, function(cmd)
-  local ok, err = pcall(function()
+  u.safe_command(function()
     local args = u.parse_args("^(%S+)%s*(%S*)%s*(%d*)$", cmd.parameter)
     local id, c = u.find_companion(args[1])
     if not id then u.error_response("Companion not found"); return end
@@ -22,14 +22,13 @@ commands.add_command("fac_resource_list", nil, function(cmd)
     table.sort(found, function(a, b) return a.distance < b.distance end)
     u.json_response({id = id, resources = found, count = #found})
   end)
-  if not ok then u.error_response(err) end
 end)
 
 -- Realistic mining using tick-based queue system
 -- Usage: /fac_resource_mine <id> <x> <y> [count] [resource_name]
 -- resource_name is optional - if provided, only mines that specific resource type
 commands.add_command("fac_resource_mine", nil, function(cmd)
-  local ok, err = pcall(function()
+  u.safe_command(function()
     local args = u.parse_args("^(%S+)%s+(%-?%d+%.?%d*)%s+(%-?%d+%.?%d*)%s*(%d*)%s*(%S*)$", cmd.parameter)
     local id, c = u.find_companion(args[1])
     if not id then u.error_response("Companion not found"); return end
@@ -50,31 +49,28 @@ commands.add_command("fac_resource_mine", nil, function(cmd)
       u.json_response({id = id, error = "Failed to start mining"})
     end
   end)
-  if not ok then u.error_response(err) end
 end)
 
 -- Check mining status
 commands.add_command("fac_resource_mine_status", nil, function(cmd)
-  local ok, err = pcall(function()
+  u.safe_command(function()
     local args = u.parse_args("^(%S+)$", cmd.parameter)
     local id = u.find_companion(args[1])
     if not id then u.error_response("Companion not found"); return end
     local status = queues.get_harvest_status(id)
     u.json_response({id = id, status = status})
   end)
-  if not ok then u.error_response(err) end
 end)
 
 -- Stop mining
 commands.add_command("fac_resource_mine_stop", nil, function(cmd)
-  local ok, err = pcall(function()
+  u.safe_command(function()
     local args = u.parse_args("^(%S+)$", cmd.parameter)
     local id = u.find_companion(args[1])
     if not id then u.error_response("Companion not found"); return end
     local result = queues.stop_harvest(id)
     u.json_response({id = id, stopped = result.stopped, harvested = result.harvested or 0})
   end)
-  if not ok then u.error_response(err) end
 end)
 
 -- NOTE: mine_real commands removed in v0.11.0
@@ -82,7 +78,7 @@ end)
 -- Use /fac_resource_mine instead - it uses mining_state with auto-restart
 
 commands.add_command("fac_resource_nearest", nil, function(cmd)
-  local ok, err = pcall(function()
+  u.safe_command(function()
     local args = u.parse_args("^(%S+)%s+(%S+)$", cmd.parameter)
     local id, c = u.find_companion(args[1])
     if not id then u.error_response("Companion not found"); return end
@@ -95,5 +91,4 @@ commands.add_command("fac_resource_nearest", nil, function(cmd)
     for _, e in ipairs(es) do local d = u.distance(e.position, pos); if d < min then min, closest = d, e end end
     u.json_response({id = id, resource = closest.name, position = {x = math.floor(closest.position.x), y = math.floor(closest.position.y)}, distance = math.floor(min), amount = closest.amount})
   end)
-  if not ok then u.error_response(err) end
 end)

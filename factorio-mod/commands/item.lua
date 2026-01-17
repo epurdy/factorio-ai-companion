@@ -3,7 +3,7 @@ local u = require("commands.init")
 local queues = require("commands.queues")
 
 commands.add_command("fac_item_craft", nil, function(cmd)
-  local ok, err = pcall(function()
+  u.safe_command(function()
     local args = u.parse_args("^(%S+)%s+(%S+)%s*(%d*)$", cmd.parameter)
     local id, c = u.find_companion(args[1])
     if not id then u.error_response("Companion not found"); return end
@@ -23,11 +23,10 @@ commands.add_command("fac_item_craft", nil, function(cmd)
     local crafted = c.entity.begin_crafting{recipe = item, count = count}
     u.json_response({id = id, crafted = crafted, item = item})
   end)
-  if not ok then u.error_response(err) end
 end)
 
 commands.add_command("fac_item_pick", nil, function(cmd)
-  local ok, err = pcall(function()
+  u.safe_command(function()
     local args = u.parse_args("^(%S+)%s*(%S*)%s*(%d*)$", cmd.parameter)
     local id, c = u.find_companion(args[1])
     if not id then u.error_response("Companion not found"); return end
@@ -46,11 +45,10 @@ commands.add_command("fac_item_pick", nil, function(cmd)
     end
     u.json_response({id = id, picked = picked})
   end)
-  if not ok then u.error_response(err) end
 end)
 
 commands.add_command("fac_item_recipes", nil, function(cmd)
-  local ok, err = pcall(function()
+  u.safe_command(function()
     local args = u.parse_args("^(%S+)%s*(%S*)$", cmd.parameter)
     local id, c = u.find_companion(args[1])
     if not id then u.error_response("Companion not found"); return end
@@ -71,12 +69,11 @@ commands.add_command("fac_item_recipes", nil, function(cmd)
     if #result > 50 then local t = {}; for i = 1, 50 do t[i] = result[i] end; result = t end
     u.json_response({id = id, recipes = result, count = #result})
   end)
-  if not ok then u.error_response(err) end
 end)
 
 -- Realistic tick-based crafting
 commands.add_command("fac_item_craft_start", nil, function(cmd)
-  local ok, err = pcall(function()
+  u.safe_command(function()
     local args = u.parse_args("^(%S+)%s+(%S+)%s*(%d*)$", cmd.parameter)
     local id, c = u.find_companion(args[1])
     if not id then u.error_response("Companion not found"); return end
@@ -86,27 +83,24 @@ commands.add_command("fac_item_craft_start", nil, function(cmd)
     result.id = id
     u.json_response(result)
   end)
-  if not ok then u.error_response(err) end
 end)
 
 commands.add_command("fac_item_craft_status", nil, function(cmd)
-  local ok, err = pcall(function()
+  u.safe_command(function()
     local args = u.parse_args("^(%S+)$", cmd.parameter)
     local id = u.find_companion(args[1])
     if not id then u.error_response("Companion not found"); return end
     local status = queues.get_craft_status(id)
     u.json_response({id = id, status = status})
   end)
-  if not ok then u.error_response(err) end
 end)
 
 commands.add_command("fac_item_craft_stop", nil, function(cmd)
-  local ok, err = pcall(function()
+  u.safe_command(function()
     local args = u.parse_args("^(%S+)$", cmd.parameter)
     local id = u.find_companion(args[1])
     if not id then u.error_response("Companion not found"); return end
     local result = queues.stop_craft(id)
     u.json_response({id = id, stopped = result.stopped, crafted = result.crafted or 0})
   end)
-  if not ok then u.error_response(err) end
 end)

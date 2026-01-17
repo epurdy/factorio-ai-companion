@@ -70,6 +70,8 @@ function M.start_harvest(cid, position, target_count, resource_name)
   }
 
   M.start_mining_next(cid)
+  -- Set inv_snapshot immediately after starting mining
+  storage.harvest_queues[cid].inv_snapshot = c.entity.get_main_inventory().get_contents()
   return {started = true, entities = #entities, target = target_count, resource = resource_name}
 end
 

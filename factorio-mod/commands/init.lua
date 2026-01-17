@@ -37,6 +37,13 @@ function M.error_response(msg, ctx)
   rcon.print('{"error":"' .. tostring(msg) .. '"}')
 end
 
+function M.safe_command(callback)
+  local ok, err = pcall(callback)
+  if not ok then
+    M.error_response(err)
+  end
+end
+
 function M.get_companion(id)
   local c = storage.companions[id]
   return (c and c.entity and c.entity.valid) and c or nil

@@ -25,7 +25,7 @@ export class FactorioMCPServer {
     this.server = new Server(
       {
         name: "factorio-companion",
-        version: "0.12.1",
+        version: "0.13.0",
       },
       {
         capabilities: {
@@ -115,6 +115,42 @@ export class FactorioMCPServer {
         };
       }
 
+      // session_status - get current state and instructions
+      if (toolName === "session_status") {
+        // Get companions from Lua
+        const companionsResponse = await this.rcon.sendCommand("/fac_companion_list");
+        let companions: any = {};
+        try {
+          companions = companionsResponse.success ? JSON.parse(companionsResponse.data || "{}") : {};
+        } catch { /* ignore parse errors */ }
+
+        // Get running skills from TS
+        const skills: Record<number, RunningSkill> = {};
+        runningSkills.forEach((skill, id) => {
+          skills[id] = skill;
+        });
+
+        const status = {
+          companions: companions.companions || {},
+          companionCount: companions.count || 0,
+          runningSkills: skills,
+          instructions: {
+            step1: "Spawn companions: companion_spawn(companionId: 1)",
+            step2: "Start reactive loop: Bash(run_in_background: true): bun run src/reactive-all.ts",
+            step3: "Poll messages: TaskOutput(task_id, block: true, timeout: 120000)",
+            step4: "Parse JSON array, respond with chat_say + actions, repeat from step2"
+          },
+          reactiveLoopCommand: "bun run src/reactive-all.ts"
+        };
+
+        return {
+          content: [{
+            type: "text" as const,
+            text: JSON.stringify(status, null, 2)
+          }]
+        };
+      }
+
       // companion_status - get companion position + running skill
       if (toolName === "companion_status") {
         const companionId = args.companionId as number;
@@ -143,30 +179,38 @@ export class FactorioMCPServer {
         };
       }
 
-      // companion_stop - kill a running skill
+      // companion_stop - kill a running skill AND clear Lua queues
       if (toolName === "companion_stop") {
         const companionId = args.companionId as number;
         const skill = runningSkills.get(companionId);
+        const results: string[] = [];
+
+        // Always clear Lua queues (harvest, craft, build, combat)
+        await this.rcon.sendCommand(`/fac_resource_mine_stop ${companionId}`);
+        await this.rcon.sendCommand(`/fac_item_craft_stop ${companionId}`);
+        await this.rcon.sendCommand(`/fac_move_stop ${companionId}`);
+        results.push("Cleared Lua queues");
 
         if (!skill) {
           return {
-            content: [{ type: "text" as const, text: `No skill running for companion ${companionId}` }]
+            content: [{ type: "text" as const, text: `No TS skill running for companion ${companionId}. ${results.join(". ")}` }]
           };
         }
 
         try {
           process.kill(skill.pid);
           runningSkills.delete(companionId);
+          results.push(`Stopped ${skill.skillName} (pid ${skill.pid})`);
           return {
             content: [{
               type: "text" as const,
-              text: `Stopped ${skill.skillName} for companion ${companionId} (pid ${skill.pid})`
+              text: `Stopped ${skill.skillName} for companion ${companionId} (pid ${skill.pid}). ${results.join(". ")}`
             }]
           };
         } catch (e) {
           runningSkills.delete(companionId);
           return {
-            content: [{ type: "text" as const, text: `Process already dead, cleaned up tracking` }]
+            content: [{ type: "text" as const, text: `Process already dead, cleaned up tracking. ${results.join(". ")}` }]
           };
         }
       }

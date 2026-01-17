@@ -22,11 +22,27 @@ export class RCONClient {
         await this.connectOnce();
         console.error(`✅ RCON connected on attempt ${attempt}`);
         return;
-      } catch (error) {
-        console.error(`❌ RCON connection attempt ${attempt} failed:`, error);
+      } catch (error: any) {
+        const errorMsg = error?.message || String(error);
+        console.error(`❌ RCON connection attempt ${attempt} failed:`, errorMsg);
 
         if (attempt === maxRetries) {
-          throw new Error(`Failed to connect after ${maxRetries} attempts`);
+          const isConnectionRefused = errorMsg.includes("ECONNREFUSED") || errorMsg.includes("connect");
+          if (isConnectionRefused) {
+            throw new Error(
+              `❌ Cannot connect to Factorio RCON (${this.config.host}:${this.config.port})\n\n` +
+              `SOLUTION: Start Factorio in Multiplayer mode\n` +
+              `1. Launch Factorio\n` +
+              `2. Go to: Multiplayer → Host New Game\n` +
+              `3. RCON will be automatically enabled\n\n` +
+              `RCON config should be in %APPDATA%\\Factorio\\config\\config.ini:\n` +
+              `  local-rcon-socket=127.0.0.1:34198\n` +
+              `  local-rcon-password=factorio\n\n` +
+              `If missing, add those lines and restart Factorio.\n\n` +
+              `Original error: ${errorMsg}`
+            );
+          }
+          throw new Error(`Failed to connect after ${maxRetries} attempts: ${errorMsg}`);
         }
 
         // Exponential backoff: 1s, 2s, 4s

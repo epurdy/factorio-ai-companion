@@ -25,7 +25,7 @@ xcopy /E /I factorio-mod "%APPDATA%\Factorio\mods\ai-companion"
 
 ### 3. Configure RCON in Factorio
 
-Edit `%APPDATA%\Factorio\config\config.ini` and set:
+Edit `%APPDATA%\Factorio\config\config.ini` and add these lines (if not already present):
 
 ```ini
 local-rcon-socket=127.0.0.1:34198

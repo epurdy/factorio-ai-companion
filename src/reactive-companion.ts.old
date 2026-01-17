@@ -5,9 +5,10 @@
 // - Polls for messages and exits with JSON when one arrives
 
 import { RCONClient } from "./rcon/client";
+import { getRCONConfig } from "./config";
+import { connectWithRetry, sleep } from "./utils/connection";
 
 const POLL_INTERVAL = 1000;
-const MAX_RETRIES = 5;
 
 const companionId = parseInt(process.argv[2]);
 if (!companionId || isNaN(companionId)) {
@@ -15,25 +16,7 @@ if (!companionId || isNaN(companionId)) {
   process.exit(1);
 }
 
-const rcon = new RCONClient({
-  host: process.env.FACTORIO_HOST || "127.0.0.1",
-  port: parseInt(process.env.FACTORIO_RCON_PORT || "34198"),
-  password: process.env.FACTORIO_RCON_PASSWORD || "factorio",
-});
-
-async function connectWithRetry(): Promise<void> {
-  for (let i = 0; i < MAX_RETRIES; i++) {
-    try {
-      await rcon.connect();
-      console.error(`[#${companionId}] RCON connected`);
-      return;
-    } catch (e) {
-      console.error(`[#${companionId}] Retry ${i + 1}/${MAX_RETRIES}...`);
-      await new Promise((r) => setTimeout(r, 2000));
-    }
-  }
-  throw new Error("Failed to connect to RCON");
-}
+const rcon = new RCONClient(getRCONConfig());
 
 async function ensureCompanionExists(): Promise<boolean> {
   // Spawn with specific ID (will be ignored if already exists)
@@ -74,13 +57,14 @@ async function checkMessages(): Promise<
 }
 
 async function main(): Promise<void> {
-  await connectWithRetry();
+  await connectWithRetry(rcon, 5);
+  console.error(`[#${companionId}] RCON connected`);
 
   // Ensure companion entity exists
   await ensureCompanionExists();
 
   // Announce presence
-  await say("Listo! Esperando instrucciones...");
+  await say("Ready! Waiting for instructions...");
   console.error(`[#${companionId}] Waiting for messages...`);
 
   while (true) {
@@ -91,7 +75,7 @@ async function main(): Promise<void> {
       await rcon.disconnect();
       process.exit(0);
     }
-    await new Promise((r) => setTimeout(r, POLL_INTERVAL));
+    await sleep(POLL_INTERVAL);
   }
 }
 
