@@ -1,6 +1,6 @@
 # Factorio AI Companion
 
-Bridge between Factorio game and Claude Code via RCON + MCP.
+AI companions for Factorio 2.x with RCON commands and TypeScript orchestration.
 
 ## IMPORTANT: FLE Reference
 
@@ -16,15 +16,14 @@ When implementing new features, ALWAYS check FLE first:
 ## Architecture
 
 ```
-Factorio (Lua mod) <--RCON--> TypeScript <--MCP--> Claude Code
+┌─────────────────┐     RCON      ┌──────────────────┐
+│  TS Orchestrator │◄────────────►│  Factorio Mod    │
+│  (Claude Code)   │              │  (ai-companion)  │
+└─────────────────┘              └──────────────────┘
+        │
+        ▼
+  Claude API (subagents per companion)
 ```
-
-1. Player writes `/fac <message>` in Factorio
-2. Lua stores in `storage.companion_messages[]`
-3. TypeScript polls RCON `/companion_get_messages`
-4. Claude processes and responds via `/companion_send`
-
-**Colors:** `[username]` cyan, `[Claude]` green
 
 ## Project Structure
 
@@ -32,23 +31,116 @@ Factorio (Lua mod) <--RCON--> TypeScript <--MCP--> Claude Code
 factorio-ai-companion/          # THIS REPO
 ├── src/
 │   ├── rcon/client.ts          # RCON client
-│   ├── rcon/types.ts
 │   ├── mcp/server.ts           # MCP server (stdio)
-│   ├── mcp/tools.ts
-│   ├── reactive.ts             # One-shot message waiter (ACTIVE)
-│   ├── daemon.ts               # Continuous polling (alternative)
-│   └── index.ts                # MCP entry point
+│   ├── reactive.ts             # One-shot message waiter
+│   ├── daemon.ts               # Continuous polling
+│   └── skills/                 # TypeScript skills
+├── factorio-mod/               # Source for Factorio mod
+│   ├── control.lua
+│   ├── data.lua
+│   ├── info.json
+│   └── commands/               # Modular commands (v0.7.0)
 ├── .mcp.json
-├── claude.md                   # THIS FILE - read first!
+├── claude.md                   # THIS FILE
 └── package.json
 
-%APPDATA%/Factorio/mods/ai-companion/   # FACTORIO MOD
-├── info.json                   # Version 0.2.1
-└── control.lua
-
-../factorio-learning-environment/       # FLE REFERENCE (separate repo)
-└── fle/env/tools/agent/        # Look here for Lua patterns
+%APPDATA%/Factorio/mods/ai-companion/   # INSTALLED MOD
+└── (copy of factorio-mod/)
 ```
+
+## Mod Structure (v0.7.0)
+
+```
+ai-companion/
+├── control.lua          # Main entry, /fac player command, walking queue
+├── data.lua             # Sound definitions (wololo)
+├── info.json            # Mod metadata (v0.7.0, 38 commands)
+└── commands/
+    ├── init.lua         # Shared utilities (colors, helpers, distance)
+    ├── action.lua       # attack, flee, patrol, wololo
+    ├── building.lua     # can_place, empty, fill, fuel, info, place, recipe, remove, rotate
+    ├── chat.lua         # get, say
+    ├── companion.lua    # disappear, health, inventory, position, spawn
+    ├── context.lua      # clear, check
+    ├── item.lua         # craft, pick, recipes
+    ├── move.lua         # follow, stop, to
+    ├── research.lua     # get, progress, set
+    ├── resource.lua     # list, mine, nearest
+    ├── world.lua        # nearest, scan
+    └── help.lua         # help command
+```
+
+## RCON Commands (38 total)
+
+All commands: `fac_<category>_<action>`
+
+| Category   | Commands | Count |
+|------------|----------|-------|
+| action     | attack, flee, patrol, wololo | 4 |
+| building   | can_place, empty, fill, fuel, info, place, recipe, remove, rotate | 9 |
+| chat       | get, say | 2 |
+| companion  | disappear, health, inventory, position, spawn | 5 |
+| context    | clear, check | 2 |
+| item       | craft, pick, recipes | 3 |
+| move       | follow, stop, to | 3 |
+| research   | get, progress, set | 3 |
+| resource   | list, mine, nearest | 3 |
+| world      | nearest, scan | 2 |
+| help       | help | 1 |
+
+### Key Commands
+
+```lua
+-- Spawn companion
+/fac_companion_spawn id=1
+
+-- Move companion
+/fac_move_to 1 100 50
+/fac_move_follow 1 PlayerName
+/fac_move_stop 1
+
+-- Chat (id=0 for orchestrator)
+/fac_chat_say 0 "Hello from Claude"
+/fac_chat_say 1 "Hello from companion #1"
+/fac_chat_get         -- Get all unread
+/fac_chat_get 1       -- Get for companion #1
+
+-- Context management
+/fac_context_clear 1      -- Clear companion #1
+/fac_context_clear all    -- Clear all
+/fac_context_check        -- Check pending clears (for daemon)
+
+-- Despawn (drops items, signals thread close)
+/fac_companion_disappear 1
+```
+
+### Player Commands (in-game)
+
+```
+/fac                     -- Help
+/fac <message>           -- Chat to all companions
+/fac <id> <message>      -- Chat to specific companion
+/fac spawn [n]           -- Request spawn
+/fac list                -- List companions
+/fac kill [id]           -- Kill companion(s)
+/fac clear               -- Clear message queue
+/fac name <id> <name>    -- Name a companion
+```
+
+## Storage Model
+
+```lua
+storage = {
+  companion_messages = {},     -- Message queue (temporary, auto-cleaned)
+  companions = {},             -- Active companions {entity, color, label, name}
+  companion_next_id = 1,       -- ID counter
+  walking_queues = {},         -- Movement targets
+  context_clear_requests = {}, -- Pending clears for TS daemon
+  errors = {}                  -- Error log (max 50)
+}
+```
+
+**Important:** `companion_messages` is a **queue**, not context storage. Context lives in Claude Code threads.
 
 ## Factorio Setup
 
@@ -71,188 +163,58 @@ local-rcon-password=factorio
 3. Load save or start new game
 4. Server runs with RCON enabled on port 34198
 
-**Why multiplayer?** RCON is designed for server administration. Single player mode doesn't expose the RCON socket.
-
 ### 3. Mod Installation
 
-The mod is already installed at:
-```
-%APPDATA%\Factorio\mods\ai-companion\
-```
+Copy `factorio-mod/` contents to `%APPDATA%\Factorio\mods\ai-companion\`
 
-Restart Factorio after any mod changes to reload Lua code.
+Restart Factorio after any mod changes.
 
-## How to Use (Instructions for Claude)
+## Workflow
 
-### Starting a Chat Session
+**The repo is the source of truth.** After making changes:
 
-When the user wants to interact via Factorio chat:
-
-1. **Start reactive listener:**
-   ```typescript
-   bun run src/reactive.ts
-   ```
-   This runs in background and waits for a message (blocks until found).
-
-2. **Wait for message:**
-   ```typescript
-   TaskOutput(task_id, block: true, timeout: 60000)
-   ```
-   This blocks until user writes `/fac <message>` in Factorio.
-
-3. **Parse output:**
-   The output is JSON format:
-   ```json
-   {"player":"username","message":"text here","tick":12345}
-   ```
-
-4. **Respond:**
+1. Edit files in `factorio-mod/`
+2. Test locally
+3. Update version in `info.json`
+4. Commit and push
+5. Copy to AppData:
    ```bash
-   bun -e "
-   import { RCONClient } from './src/rcon/client';
-   const client = new RCONClient({ host: '127.0.0.1', port: 34198, password: 'factorio' });
-   await client.connect();
-   await client.sendCommand('/companion_send Your response here');
-   await client.disconnect();
-   "
+   # Windows
+   xcopy /E /Y "factorio-mod\*" "%APPDATA%\Factorio\mods\ai-companion\"
    ```
+6. Restart Factorio to load changes
 
-5. **Loop:** Restart reactive.ts for next message (goto step 1)
+## TypeScript Skills
 
-### Reactive Loop Pattern
+Located in `src/skills/`:
 
 ```typescript
-// One iteration:
-[Start reactive.ts] → [User writes /fac] → [Process & respond] → [Restart reactive.ts]
-```
-
-**Why one-shot?** Because Claude can only react when TaskOutput completes. The script exits when a message is found, triggering Claude to process it.
-
-**Latency:** ~1-3 seconds
-- Poll interval: 1 second
-- RCON: <100ms
-- Claude processing: variable
-
-### Available MCP Tools
-
-Currently implemented in `.mcp.json`:
-- `get_companion_messages` - Fetch unread messages (returns JSON array)
-- `send_companion_message` - Send response to Factorio chat
-
-**Note:** These tools use stdio MCP server which launches on-demand. For reactive chat, use the `reactive.ts` approach instead.
-
-## Lua Mod Commands
-
-### Player Commands (in-game)
-- `/fac <message>` - Send message to Claude (default)
-- `/fac spawn [n]` - Spawn n companions (default 1, max 10)
-- `/fac list` - List active companions with positions
-- `/fac kill [id]` - Kill companion by ID (or all if no ID)
-- `/fac clear` - Clear message queue
-- `/fac thread <id> <message>` - Send message to specific companion
-
-### RCON Commands (TypeScript calls these)
-
-**Messaging:**
-- `/companion_get_messages` - Returns JSON array of unread messages
-  ```json
-  [{"player":"user","message":"text","tick":123,"target_companion":1}]
-  ```
-- `/companion_send <message>` - Orchestrator (Claude) speaks in green
-- `/companion_say <id> <message>` - Companion #id speaks in its unique color
-- `/companion_get_errors` - Get and clear Lua errors (for debugging)
-- `/companion_cleanup` - Removes messages older than 10 minutes
-
-**Companion Management:**
-- `/companion_spawn [count] [x] [y]` - Spawn companions at position
-- `/companion_list` - List all companions as JSON
-- `/companion_kill [id]` - Kill companion(s)
-
-**Companion Actions:**
-- `/companion_move <id> <x> <y>` - Teleport companion (fast mode)
-- `/companion_walk <id> <x> <y>` - Walk companion realistically
-- `/companion_stop <id>` - Stop companion movement
-- `/companion_mine <id> <x> <y> [count]` - Mine resources
-- `/companion_craft <id> <item> [count]` - Craft item
-- `/companion_inventory <id>` - Get companion inventory
-- `/companion_place <id> <entity> <x> <y> [direction]` - Place entity
-
-## Adding Game State Queries (FLE Integration)
-
-When adding observation tools (inventory, entities, research):
-
-### 1. Reference FLE Implementation
-
-Check `../factorio-learning-environment/fle/env/tools/agent/` for existing patterns.
-
-**Top priority tools to port:**
-1. `inspect_inventory` - Player/entity inventory contents
-2. `get_entities` - Nearby entities with positions and types
-3. `get_resource_patch` - Resource locations and amounts
-4. `get_research_progress` - Current research status
-5. `get_production_stats` - Factory production statistics
-
-### 2. FLE Lua Patterns
-
-```lua
--- Finding entities in area
-local area = {{x-radius, y-radius}, {x+radius, y+radius}}
-local entities = surface.find_entities_filtered{
-  area = area,
-  force = player.force,
-  name = entity_names  -- optional filter
+interface SkillContext {
+  rcon: RCONClient;
+  companionId: number;
 }
 
--- Reading inventories
-local contents = entity.get_inventory(defines.inventory.chest).get_contents()
--- Returns: {["iron-plate"] = 50, ["copper-plate"] = 30}
+interface SkillResult {
+  success: boolean;
+  message: string;
+  data?: Record<string, unknown>;
+}
 
--- Research status
-local tech = force.technologies[name]
-local progress = force.research_progress  -- 0.0 to 1.0
-
--- Entity serialization (FLE has utils for this)
-local serialized = global.utils.serialize_entity(entity)
+async function exec(ctx: SkillContext, command: string): Promise<Record<string, unknown>>
 ```
 
-### 3. Implementation Steps
+## Development
 
-1. **Add Lua command** to `control.lua`:
-   ```lua
-   commands.add_command("companion_get_inventory", "Get player inventory", function(command)
-     local success, result = pcall(function()
-       local player = game.players[1]  -- Or get from command
-       local inventory = player.get_main_inventory()
-       local contents = inventory.get_contents()
+```bash
+# Install dependencies
+bun install
 
-       local json_success, json_result = pcall(helpers.table_to_json, contents)
-       if json_success then
-         rcon.print(json_result)
-       else
-         rcon.print('{"error": "Serialization failed"}')
-       end
-     end)
+# Build
+bun run build
 
-     if not success then
-       rcon.print('{"error": "' .. tostring(result) .. '"}')
-     end
-   end)
-   ```
-
-2. **Add TypeScript wrapper** in `src/mcp/server.ts` or call directly via RCON
-
-3. **Test** via RCON:
-   ```typescript
-   const response = await client.sendCommand('/companion_get_inventory');
-   const data = JSON.parse(response.data);
-   ```
-
-### 4. Factorio 2.x API Changes
-
-Important differences from Factorio 1.x (which FLE targets):
-- `global` → `storage` (mod data storage)
-- `game.table_to_json()` → `helpers.table_to_json()` (JSON serialization)
-- Always use `pcall()` for error handling
+# Test RCON connection
+bun run src/rcon/client.ts
+```
 
 ## Environment Variables
 
@@ -262,7 +224,12 @@ FACTORIO_RCON_PORT=34198
 FACTORIO_RCON_PASSWORD=factorio
 ```
 
-Defined in `.mcp.json` and used by `src/rcon/client.ts`.
+## Factorio 2.x Notes
+
+- Use `storage` instead of `global`
+- Use `helpers.table_to_json()` for JSON
+- Color format: `{color = {r, g, b}}` for `game.print()`
+- Mod dependency: `base >= 2.0`
 
 ## Troubleshooting
 
@@ -276,41 +243,19 @@ Defined in `.mcp.json` and used by `src/rcon/client.ts`.
 - Typo in command name
 
 ### Messages not appearing
-- Check mod version matches (0.2.0)
-- Verify RCON connection: `bun -e "import {RCONClient} from './src/rcon/client'; const c = new RCONClient({host:'127.0.0.1',port:34198,password:'factorio'}); await c.connect(); console.log('OK');"`
-
-### Reactive loop not triggering
-- Ensure TaskOutput is set to `block: true`
-- Check timeout (default 60s, increase if needed)
-- Verify reactive.ts exits with code 0 when message found
+- Check mod version matches
+- Verify RCON connection
 
 ## Version History
 
-- **0.3.2** - Error logging via RCON: companion_get_errors returns Lua errors for debugging
-- **0.3.1** - Colored companions: each thread has unique color, orchestrator green, companion_say RCON
-- **0.3.0** - Code refactor: DRY helpers, subcommand table, removed AI slop, scalable architecture
-- **0.2.2** - Companion system with spawn/list/kill, action commands (move, walk, mine, craft, place, inventory)
-- **0.2.1** - Codebase cleanup, remove unused files and AI slop
-- **0.2.0** - Complete documentation, reactive loop guide
-- **0.1.7** - Chat color differentiation ([user] cyan, [Claude] green)
-- **0.1.6** - Added `/fac` alias
-- **0.1.5** - Fixed JSON serialization (helpers.table_to_json)
-- **0.1.4** - Fixed command registration
-- **0.1.3** - Factorio 2.x compatibility (global → storage)
-- **0.1.2** - Failed init fix attempt
-- **0.1.1** - Failed global initialization
-- **0.1.0** - Initial implementation
-
-## Next Steps
-
-1. Port FLE observation tools (inventory, entities, research)
-2. Add MCP tools for each observation command
-3. Implement context-aware responses (Claude queries game state when needed)
-4. Phase 2: Control commands (move, place, craft)
+- **0.7.0** - Modular code split (12 command files), DRY utilities, context management
+- **0.6.0** - Added context_clear, context_check, companion_disappear
+- **0.3.6** - Parallel companions, naming, 8-direction movement
+- **0.3.0** - Code refactor, DRY helpers, scalable architecture
+- **0.2.0** - Complete documentation, reactive loop
 
 ## References
 
 - [Factorio Lua API 2.0](https://lua-api.factorio.com/latest/)
 - [FLE Source](../factorio-learning-environment/)
 - [MCP Protocol](https://modelcontextprotocol.io/)
-- [RCON Protocol](https://developer.valvesoftware.com/wiki/Source_RCON_Protocol)

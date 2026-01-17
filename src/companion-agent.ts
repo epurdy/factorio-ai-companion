@@ -20,22 +20,18 @@ const rcon = new RCONClient({
 async function getMessagesForMe(): Promise<
   Array<{ player: string; message: string; tick: number; target_companion?: number }>
 > {
-  const response = await rcon.sendCommand("/companion_get_messages");
+  const response = await rcon.sendCommand(`/fac_chat_get ${companionId}`);
   if (!response.success || !response.data) return [];
 
   try {
-    const all = JSON.parse(response.data);
-    // Filter only messages targeted at this companion
-    return all.filter(
-      (m: { target_companion?: number }) => m.target_companion === companionId
-    );
+    return JSON.parse(response.data);
   } catch {
     return [];
   }
 }
 
 async function say(message: string): Promise<void> {
-  await rcon.sendCommand(`/companion_say ${companionId} ${message}`);
+  await rcon.sendCommand(`/fac_chat_say ${companionId} ${message}`);
 }
 
 async function pollLoop(): Promise<void> {

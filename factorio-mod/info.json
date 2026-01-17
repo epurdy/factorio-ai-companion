@@ -1,9 +1,9 @@
 {
   "name": "ai-companion",
-  "version": "0.3.6",
+  "version": "0.7.0",
   "title": "AI Companion",
   "author": "lveillard",
   "factorio_version": "2.0",
-  "description": "Chat bridge with orchestrator + colored companion threads via RCON",
+  "description": "AI companions with 38 RCON commands. Factorio 2.x compatible.",
   "dependencies": ["base >= 2.0"]
 }

@@ -43,7 +43,7 @@ async function connectWithRetry(): Promise<boolean> {
 
 async function pollMessages(): Promise<void> {
   try {
-    const response = await client.sendCommand('/companion_get_messages');
+    const response = await client.sendCommand('/fac_chat_get orchestrator');
 
     if (response.success && response.data) {
       const messages = JSON.parse(response.data || '[]');
@@ -64,7 +64,7 @@ async function pollMessages(): Promise<void> {
 
 async function sendResponse(message: string): Promise<boolean> {
   try {
-    const response = await client.sendCommand(`/companion_send ${message}`);
+    const response = await client.sendCommand(`/fac_chat_say 0 ${message}`);
     return response.success;
   } catch (error) {
     console.error('Failed to send:', error);

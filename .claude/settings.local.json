@@ -1,0 +1,6 @@
+{
+  "enabledMcpjsonServers": [
+    "factorio-companion"
+  ],
+  "enableAllProjectMcpServers": true
+}

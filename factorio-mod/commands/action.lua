@@ -1,0 +1,72 @@
+-- AI Companion v0.7.0 - Action commands
+local u = require("commands.init")
+
+commands.add_command("fac_action_attack", nil, function(cmd)
+  local ok, err = pcall(function()
+    local args = u.parse_args("^(%S+)%s+([%d.-]+)%s+([%d.-]+)$", cmd.parameter)
+    local id, c = u.find_companion(args[1])
+    if not id then u.error_response("Companion not found"); return end
+    local x, y = tonumber(args[2]), tonumber(args[3])
+    if not x or not y then u.error_response("Invalid coordinates"); return end
+    local target_pos = {x = x, y = y}
+    local targets = c.entity.surface.find_entities_filtered{position = target_pos, radius = 2, limit = 1}
+    local t = targets[1]
+    if t and t.valid and t ~= c.entity and t.health then
+      c.entity.shooting_state = {state = defines.shooting.shooting_enemies, position = t.position}
+      u.json_response({id = id, attacking = true, target = t.name, position = {x = t.position.x, y = t.position.y}})
+    else
+      c.entity.shooting_state = {state = defines.shooting.shooting_enemies, position = target_pos}
+      u.json_response({id = id, attacking = true, target = "ground", position = target_pos})
+    end
+  end)
+  if not ok then u.error_response(err) end
+end)
+
+commands.add_command("fac_action_flee", nil, function(cmd)
+  local ok, err = pcall(function()
+    local args = u.parse_args("^(%S+)%s*(%d*)$", cmd.parameter)
+    local id, c = u.find_companion(args[1])
+    if not id then u.error_response("Companion not found"); return end
+    local dist = tonumber(args[2]) or 30
+    local pos = c.entity.position
+    local enemies = c.entity.surface.find_entities_filtered{type = {"unit", "unit-spawner", "turret"}, position = pos, radius = 50, force = "enemy", limit = 5}
+    if #enemies == 0 then u.json_response({id = id, fleeing = false, message = "No enemies"}); return end
+    local ax, ay = 0, 0
+    for _, e in ipairs(enemies) do ax, ay = ax + e.position.x, ay + e.position.y end
+    ax, ay = ax / #enemies, ay / #enemies
+    local dx, dy = pos.x - ax, pos.y - ay
+    local len = math.sqrt(dx*dx + dy*dy)
+    if len > 0 then dx, dy = dx / len * dist, dy / len * dist else dx = dist end
+    local flee_pos = {x = pos.x + dx, y = pos.y + dy}
+    storage.walking_queues[id] = {target = flee_pos}
+    u.json_response({id = id, fleeing = true, enemies = #enemies, to = flee_pos})
+  end)
+  if not ok then u.error_response(err) end
+end)
+
+commands.add_command("fac_action_patrol", nil, function(cmd)
+  local ok, err = pcall(function()
+    local id = u.find_companion(cmd.parameter)
+    if not id then u.error_response("Companion not found"); return end
+    u.json_response({id = id, error = "Not implemented"})
+  end)
+  if not ok then u.error_response(err) end
+end)
+
+commands.add_command("fac_action_wololo", nil, function(cmd)
+  local ok, err = pcall(function()
+    local id, c = u.find_companion(cmd.parameter)
+    if not id then u.error_response("Companion not found"); return end
+    local pos, surf, force = c.entity.position, c.entity.surface, c.entity.force
+    local enemies = surf.find_entities_filtered{type = {"unit", "unit-spawner"}, position = pos, radius = 10, limit = 1}
+    local t
+    for _, e in ipairs(enemies) do if e.valid and e.force.name ~= force.name then t = e; break end end
+    if not t then u.json_response({id = id, wololo = false, error = "No enemy"}); return end
+    game.print("[" .. u.get_companion_display(id) .. "] WOLOLO!", u.print_color(c.color or u.get_companion_color(id)))
+    pcall(function() surf.play_sound{path = "ai-companion-wololo", position = pos} end)
+    local old = t.force.name
+    t.force = force
+    u.json_response({id = id, wololo = true, converted = t.name, from = old})
+  end)
+  if not ok then u.error_response(err) end
+end)

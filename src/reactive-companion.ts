@@ -37,7 +37,7 @@ async function connectWithRetry(): Promise<void> {
 
 async function ensureCompanionExists(): Promise<boolean> {
   // Spawn with specific ID (will be ignored if already exists)
-  const spawnResp = await rcon.sendCommand(`/companion_spawn id=${companionId}`);
+  const spawnResp = await rcon.sendCommand(`/fac_companion_spawn id=${companionId}`);
   if (spawnResp.success && spawnResp.data) {
     try {
       const result = JSON.parse(spawnResp.data);
@@ -55,14 +55,14 @@ async function ensureCompanionExists(): Promise<boolean> {
 }
 
 async function say(message: string): Promise<void> {
-  await rcon.sendCommand(`/companion_say ${companionId} ${message}`);
+  await rcon.sendCommand(`/fac_chat_say ${companionId} ${message}`);
 }
 
 async function checkMessages(): Promise<
   { player: string; message: string; tick: number } | null
 > {
   // Get only messages targeted at this companion
-  const response = await rcon.sendCommand(`/companion_get_messages ${companionId}`);
+  const response = await rcon.sendCommand(`/fac_chat_get ${companionId}`);
   if (!response.success || !response.data) return null;
 
   try {

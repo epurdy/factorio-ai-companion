@@ -16,7 +16,7 @@ export class FactorioMCPServer {
     this.server = new Server(
       {
         name: "factorio-companion",
-        version: "0.3.6",
+        version: "0.7.0",
       },
       {
         capabilities: {
@@ -62,7 +62,7 @@ export class FactorioMCPServer {
     this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
       switch (request.params.name) {
         case "get_companion_messages": {
-          const response = await this.rcon.sendCommand("/companion_get_messages");
+          const response = await this.rcon.sendCommand("/fac_chat_get");
 
           if (!response.success) {
             return {
@@ -100,7 +100,7 @@ export class FactorioMCPServer {
           }
 
           const response = await this.rcon.sendCommand(
-            `/companion_send ${parsed.data.message}`
+            `/fac_chat_say 0 ${parsed.data.message}`
           );
 
           return {
@@ -123,7 +123,7 @@ export class FactorioMCPServer {
 
   private async checkForMessages() {
     try {
-      const response = await this.rcon.sendCommand("/companion_get_messages");
+      const response = await this.rcon.sendCommand("/fac_chat_get");
 
       if (response.success && response.data) {
         const messages = JSON.parse(response.data || "[]");

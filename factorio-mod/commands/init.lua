@@ -1,0 +1,99 @@
+-- AI Companion v0.7.0
+local M = {}
+
+M.COLORS = {
+  player = {r=0.4, g=0.8, b=1},
+  orchestrator = {r=0.3, g=1, b=0.3},
+  system = {r=1, g=0.5, b=0},
+  error = {r=1, g=0, b=0}
+}
+
+M.COMPANION_COLORS = {
+  {r=1, g=0.6, b=0.2}, {r=0.8, g=0.4, b=1}, {r=1, g=1, b=0.3}, {r=0.4, g=1, b=0.8},
+  {r=1, g=0.4, b=0.6}, {r=0.6, g=0.8, b=1}, {r=1, g=0.8, b=0.4}, {r=0.7, g=1, b=0.5}
+}
+
+M.dir_map = {
+  [0] = defines.direction.north, [1] = defines.direction.east,
+  [2] = defines.direction.south, [3] = defines.direction.west
+}
+
+function M.print_color(c) return {color = c} end
+
+function M.get_companion_color(id)
+  return M.COMPANION_COLORS[((id - 1) % #M.COMPANION_COLORS) + 1]
+end
+
+function M.json_response(data)
+  local ok, result = pcall(helpers.table_to_json, data)
+  rcon.print(ok and result or '{"error":"JSON failed"}')
+end
+
+function M.error_response(msg, ctx)
+  if storage.errors then
+    table.insert(storage.errors, {context = ctx or "rcon", error = tostring(msg), tick = game.tick})
+    if #storage.errors > 50 then table.remove(storage.errors, 1) end
+  end
+  rcon.print('{"error":"' .. tostring(msg) .. '"}')
+end
+
+function M.get_companion(id)
+  local c = storage.companions[id]
+  return (c and c.entity and c.entity.valid) and c or nil
+end
+
+function M.find_companion(identifier)
+  local id = tonumber(identifier)
+  if id then
+    local c = M.get_companion(id)
+    if c then return id, c end
+  end
+  for cid, c in pairs(storage.companions) do
+    if c.name and c.name:lower() == identifier:lower() and c.entity and c.entity.valid then
+      return cid, c
+    end
+  end
+  return nil, nil
+end
+
+function M.get_companion_display(id)
+  local c = storage.companions[id]
+  return c and c.name and (c.name .. "(#" .. id .. ")") or ("#" .. id)
+end
+
+function M.parse_args(pattern, args)
+  return args and {args:match(pattern)} or {}
+end
+
+function M.distance(a, b)
+  return math.sqrt((a.x - b.x)^2 + (a.y - b.y)^2)
+end
+
+function M.get_direction(from, to)
+  local dx, dy = to.x - from.x, to.y - from.y
+  if math.abs(dx) < 0.5 and math.abs(dy) < 0.5 then return nil end
+  local deg = math.atan2(dy, dx) * 180 / math.pi
+  if deg < 0 then deg = deg + 360 end
+  local dirs = {
+    {337.5, 22.5, defines.direction.east}, {22.5, 67.5, defines.direction.southeast},
+    {67.5, 112.5, defines.direction.south}, {112.5, 157.5, defines.direction.southwest},
+    {157.5, 202.5, defines.direction.west}, {202.5, 247.5, defines.direction.northwest},
+    {247.5, 292.5, defines.direction.north}, {292.5, 337.5, defines.direction.northeast}
+  }
+  for _, d in ipairs(dirs) do
+    if d[1] > d[2] then
+      if deg >= d[1] or deg < d[2] then return d[3] end
+    elseif deg >= d[1] and deg < d[2] then return d[3] end
+  end
+  return defines.direction.east
+end
+
+function M.render_label(entity, text, color)
+  if not rendering then return nil end
+  return rendering.draw_text{
+    text = text, surface = entity.surface, target = entity,
+    target_offset = {0, -2.5}, color = color, scale = 1.5, alignment = "center", use_rich_text = false
+  }
+end
+
+return M

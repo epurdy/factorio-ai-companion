@@ -16,14 +16,27 @@ const client = new RCONClient({
   password: process.env.FACTORIO_RCON_PASSWORD || 'factorio'
 });
 
+async function connectWithRetry(maxAttempts = 30): Promise<void> {
+  for (let i = 0; i < maxAttempts; i++) {
+    try {
+      await client.connect();
+      return;
+    } catch {
+      console.error(`Connection attempt ${i + 1}/${maxAttempts} failed, retrying in 5s...`);
+      await new Promise(r => setTimeout(r, 5000));
+    }
+  }
+  throw new Error(`Failed to connect after ${maxAttempts} attempts`);
+}
+
 async function waitForMessage(): Promise<void> {
   try {
-    await client.connect();
+    await connectWithRetry();
     console.error('Connected. Waiting for message...');
 
     while (true) {
       // Get only orchestrator messages (no target_companion)
-      const response = await client.sendCommand('/companion_get_messages orchestrator');
+      const response = await client.sendCommand('/fac_chat_get orchestrator');
 
       if (response.success && response.data) {
         const messages = JSON.parse(response.data || '[]');
