@@ -91,7 +91,12 @@ commands.add_command("fac_resource_mine_real", nil, function(cmd)
     local dist = u.distance(c.entity.position, target)
     if dist > 5 then u.json_response({id = id, error = "Too far (" .. math.floor(dist) .. " tiles)"}); return end
 
-    -- Set native mining state
+    -- Find resource entity at target position
+    local resources = c.entity.surface.find_entities_filtered{position = target, radius = 2, type = "resource"}
+    if #resources == 0 then u.json_response({id = id, error = "No resource at target"}); return end
+
+    -- Set native mining state (FLE-style)
+    c.entity.update_selected_entity(target)
     c.entity.mining_state = {mining = true, position = target}
 
     -- Store for tracking
