@@ -22,7 +22,8 @@ async function waitForMessage(): Promise<void> {
     console.error('Connected. Waiting for message...');
 
     while (true) {
-      const response = await client.sendCommand('/companion_get_messages');
+      // Get only orchestrator messages (no target_companion)
+      const response = await client.sendCommand('/companion_get_messages orchestrator');
 
       if (response.success && response.data) {
         const messages = JSON.parse(response.data || '[]');

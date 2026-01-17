@@ -144,21 +144,38 @@ Currently implemented in `.mcp.json`:
 ## Lua Mod Commands
 
 ### Player Commands (in-game)
-- `/companion <message>` - Send message to Claude
-- `/fac <message>` - Short alias
+- `/fac <message>` - Send message to Claude (default)
+- `/fac spawn [n]` - Spawn n companions (default 1, max 10)
+- `/fac list` - List active companions with positions
+- `/fac kill [id]` - Kill companion by ID (or all if no ID)
+- `/fac clear` - Clear message queue
+- `/fac thread <id> <message>` - Send message to specific companion
 
 ### RCON Commands (TypeScript calls these)
+
+**Messaging:**
 - `/companion_get_messages` - Returns JSON array of unread messages
   ```json
-  [{"player":"user","message":"text","tick":123}]
+  [{"player":"user","message":"text","tick":123,"target_companion":1}]
   ```
-
-- `/companion_send <message>` - Broadcasts Claude's response
-  ```
-  [Claude] message appears in green
-  ```
-
+- `/companion_send <message>` - Orchestrator (Claude) speaks in green
+- `/companion_say <id> <message>` - Companion #id speaks in its unique color
+- `/companion_get_errors` - Get and clear Lua errors (for debugging)
 - `/companion_cleanup` - Removes messages older than 10 minutes
+
+**Companion Management:**
+- `/companion_spawn [count] [x] [y]` - Spawn companions at position
+- `/companion_list` - List all companions as JSON
+- `/companion_kill [id]` - Kill companion(s)
+
+**Companion Actions:**
+- `/companion_move <id> <x> <y>` - Teleport companion (fast mode)
+- `/companion_walk <id> <x> <y>` - Walk companion realistically
+- `/companion_stop <id>` - Stop companion movement
+- `/companion_mine <id> <x> <y> [count]` - Mine resources
+- `/companion_craft <id> <item> [count]` - Craft item
+- `/companion_inventory <id>` - Get companion inventory
+- `/companion_place <id> <entity> <x> <y> [direction]` - Place entity
 
 ## Adding Game State Queries (FLE Integration)
 
@@ -269,6 +286,10 @@ Defined in `.mcp.json` and used by `src/rcon/client.ts`.
 
 ## Version History
 
+- **0.3.2** - Error logging via RCON: companion_get_errors returns Lua errors for debugging
+- **0.3.1** - Colored companions: each thread has unique color, orchestrator green, companion_say RCON
+- **0.3.0** - Code refactor: DRY helpers, subcommand table, removed AI slop, scalable architecture
+- **0.2.2** - Companion system with spawn/list/kill, action commands (move, walk, mine, craft, place, inventory)
 - **0.2.1** - Codebase cleanup, remove unused files and AI slop
 - **0.2.0** - Complete documentation, reactive loop guide
 - **0.1.7** - Chat color differentiation ([user] cyan, [Claude] green)
