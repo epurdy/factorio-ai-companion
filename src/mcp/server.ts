@@ -25,7 +25,7 @@ export class FactorioMCPServer {
     this.server = new Server(
       {
         name: "factorio-companion",
-        version: "0.13.2",
+        version: "0.13.3",
       },
       {
         capabilities: {
@@ -59,8 +59,46 @@ export class FactorioMCPServer {
         };
       };
 
+      // Helper to stop a companion's running skill (TS + Lua)
+      const stopCompanionSkill = async (companionId: number): Promise<string | null> => {
+        const skill = runningSkills.get(companionId);
+
+        // Always clear Lua queues
+        await this.rcon.sendCommand(`/fac_resource_mine_stop ${companionId}`);
+        await this.rcon.sendCommand(`/fac_item_craft_stop ${companionId}`);
+        await this.rcon.sendCommand(`/fac_move_stop ${companionId}`);
+
+        if (!skill) {
+          return null; // No TS skill was running
+        }
+
+        // Kill the TS process
+        try {
+          process.kill(skill.pid);
+          runningSkills.delete(companionId);
+          return `Stopped ${skill.skillName} (pid ${skill.pid})`;
+        } catch (e) {
+          runningSkills.delete(companionId);
+          return `Process ${skill.pid} already dead`;
+        }
+      };
+
+      // Tools that require stopping active skills before execution
+      const AUTO_STOP_TOOLS = [
+        'move_to', 'move_follow',
+        'action_attack', 'action_flee', 'action_patrol', 'action_wololo'
+      ];
+
       // Check if it's a regular RCON tool
       if (TOOLS[toolName]) {
+        // Auto-stop skills for movement/action commands
+        if (AUTO_STOP_TOOLS.includes(toolName) && args.companionId !== undefined) {
+          const stopMsg = await stopCompanionSkill(args.companionId as number);
+          if (stopMsg) {
+            console.error(`[Auto-stop] ${stopMsg} for ${toolName}`);
+          }
+        }
+
         const cmd = buildRCONCommand(toolName, args);
         return execRCON(cmd);
       }
@@ -182,37 +220,20 @@ export class FactorioMCPServer {
       // companion_stop - kill a running skill AND clear Lua queues
       if (toolName === "companion_stop") {
         const companionId = args.companionId as number;
-        const skill = runningSkills.get(companionId);
-        const results: string[] = [];
+        const stopMsg = await stopCompanionSkill(companionId);
 
-        // Always clear Lua queues (harvest, craft, build, combat)
-        await this.rcon.sendCommand(`/fac_resource_mine_stop ${companionId}`);
-        await this.rcon.sendCommand(`/fac_item_craft_stop ${companionId}`);
-        await this.rcon.sendCommand(`/fac_move_stop ${companionId}`);
-        results.push("Cleared Lua queues");
-
-        if (!skill) {
+        if (!stopMsg) {
           return {
-            content: [{ type: "text" as const, text: `No TS skill running for companion ${companionId}. ${results.join(". ")}` }]
+            content: [{ type: "text" as const, text: `No TS skill running for companion ${companionId}. Cleared Lua queues.` }]
           };
         }
 
-        try {
-          process.kill(skill.pid);
-          runningSkills.delete(companionId);
-          results.push(`Stopped ${skill.skillName} (pid ${skill.pid})`);
-          return {
-            content: [{
-              type: "text" as const,
-              text: `Stopped ${skill.skillName} for companion ${companionId} (pid ${skill.pid}). ${results.join(". ")}`
-            }]
-          };
-        } catch (e) {
-          runningSkills.delete(companionId);
-          return {
-            content: [{ type: "text" as const, text: `Process already dead, cleaned up tracking. ${results.join(". ")}` }]
-          };
-        }
+        return {
+          content: [{
+            type: "text" as const,
+            text: `${stopMsg}. Cleared Lua queues.`
+          }]
+        };
       }
 
       throw new Error(`Unknown tool: ${toolName}`);
