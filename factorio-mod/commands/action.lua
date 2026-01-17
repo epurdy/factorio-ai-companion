@@ -58,7 +58,7 @@ commands.add_command("fac_action_wololo", nil, function(cmd)
     local id, c = u.find_companion(cmd.parameter)
     if not id then u.error_response("Companion not found"); return end
     local pos, surf, force = c.entity.position, c.entity.surface, c.entity.force
-    local enemies = surf.find_entities_filtered{type = {"unit", "unit-spawner"}, position = pos, radius = 200, limit = 1}
+    local enemies = surf.find_entities_filtered{type = {"unit", "unit-spawner"}, position = pos, radius = 25, limit = 1}
     local t
     for _, e in ipairs(enemies) do if e.valid and e.force.name ~= force.name then t = e; break end end
     if not t then u.json_response({id = id, wololo = false, error = "No enemy"}); return end
