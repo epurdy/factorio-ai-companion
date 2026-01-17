@@ -73,6 +73,68 @@ If user writes `/fac spawn 2` or asks for companions:
 2. **No Task subagents needed** - YOU handle their messages in your main loop
 3. Continue the reactive-all loop
 
+## MCP TOOLS (PREFERRED METHOD)
+
+**ALWAYS use MCP tools.** They are type-safe and prevent calling non-existent commands.
+
+Tools are defined in `src/mcp/tools.ts` (single source of truth). Categories:
+- `chat_*` - Messages
+- `companion_*` - Spawn, position, inventory, health, disappear
+- `move_*` - Movement (to, follow, stop)
+- `resource_*` - Mining (nearest, list, mine, mine_status, mine_stop, **mine_until**)
+- `item_*` - Items (pick, craft, recipes)
+- `building_*` - Construction (place, remove, info, rotate, recipe, fuel, fill, empty)
+- `action_*` - Combat (attack, flee, patrol, wololo)
+- `research_*` - Research (get, set, progress)
+- `world_*` - World info (scan, nearest)
+- `context_*` - Context management (clear, check)
+
+**High-level skill:** `resource_mine_until` - Autonomous mining (walks, mines, repeats until target)
+
+## RAW RCON COMMANDS (FALLBACK)
+
+**NEVER use `echo 'cmd' | bun run src/rcon/client.ts`** - `client.ts` is a class, not a CLI tool.
+
+**ALWAYS use `bun -e` with inline code:**
+
+```bash
+cd "C:\Users\lveil\Desktop\Projects\factorio-ai-companion" && bun -e "
+import { RCONClient } from './src/rcon/client';
+const client = new RCONClient({ host: '127.0.0.1', port: 34198, password: 'factorio' });
+await client.connect();
+await client.sendCommand('/fac_chat_say 0 Mensaje sin comillas extra');
+await client.disconnect();
+"
+```
+
+### Key Rules:
+1. **NO extra quotes in commands** - Use `/fac_chat_say 0 Hola mundo`, NOT `/fac_chat_say 0 "Hola mundo"`
+2. **Always `await client.disconnect()`** at the end
+3. **Use template literals** for dynamic values: `` `/fac_move_to ${id} ${x} ${y}` ``
+
+### Common Pattern - Multiple Commands:
+
+```bash
+bun -e "
+import { RCONClient } from './src/rcon/client';
+const client = new RCONClient({ host: '127.0.0.1', port: 34198, password: 'factorio' });
+await client.connect();
+
+// Check companions
+const r1 = await client.sendCommand('/fac_companion_position 1');
+console.log('Companion 1:', r1.data);
+
+// Spawn if needed
+const r2 = await client.sendCommand('/fac_companion_spawn id=2');
+console.log('Spawn:', r2.data);
+
+// Send message
+await client.sendCommand('/fac_chat_say 0 Listo!');
+
+await client.disconnect();
+"
+```
+
 ## REACTIVE CHAT LOOP (CRITICAL)
 
 **This is how Claude communicates with Factorio AND manages all companions.**

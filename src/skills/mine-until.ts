@@ -68,11 +68,13 @@ async function getInventoryCount(itemName: string): Promise<number> {
   const data = await exec(`/fac_companion_inventory ${companionId}`);
   if (!data?.items) return 0;
 
-  for (const item of data.items) {
-    // Handle nested structure from inventory command
-    const name = item.count?.name || item.name;
-    const count = item.count?.count || item.count || 0;
-    if (name === itemName) return count;
+  // items can be:
+  // - Empty object {} when empty
+  // - Array [{name, count, quality}, ...] when items exist
+  if (Array.isArray(data.items)) {
+    for (const item of data.items) {
+      if (item.name === itemName) return item.count || 0;
+    }
   }
   return 0;
 }

@@ -4,8 +4,17 @@ import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
+import { spawn } from "child_process";
 import { RCONClient } from "../rcon/client";
-import { SendMessageSchema } from "./tools";
+import { TOOLS, SKILLS, generateToolSchemas, generateSkillSchemas, buildRCONCommand } from "./tools";
+
+// Track running skills by companionId
+interface RunningSkill {
+  pid: number;
+  skillName: string;
+  startTime: number;
+}
+const runningSkills = new Map<number, RunningSkill>();
 
 export class FactorioMCPServer {
   private server: Server;
@@ -16,7 +25,7 @@ export class FactorioMCPServer {
     this.server = new Server(
       {
         name: "factorio-companion",
-        version: "0.7.0",
+        version: "0.10.0",
       },
       {
         capabilities: {
@@ -30,94 +39,139 @@ export class FactorioMCPServer {
   }
 
   private setupHandlers() {
+    // Generate all tool schemas from single source of truth
     this.server.setRequestHandler(ListToolsRequestSchema, async () => ({
-      tools: [
-        {
-          name: "get_companion_messages",
-          description:
-            "Get unread messages from Factorio chat. Returns array of {player, message, tick}.",
-          inputSchema: {
-            type: "object",
-            properties: {},
-          },
-        },
-        {
-          name: "send_companion_message",
-          description:
-            "Send a message to Factorio chat as Claude. Appears in green text.",
-          inputSchema: {
-            type: "object",
-            properties: {
-              message: {
-                type: "string",
-                description: "Message to send to Factorio chat",
-              },
-            },
-            required: ["message"],
-          },
-        },
-      ],
+      tools: [...generateToolSchemas(), ...generateSkillSchemas()],
     }));
 
     this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
-      switch (request.params.name) {
-        case "get_companion_messages": {
-          const response = await this.rcon.sendCommand("/fac_chat_get");
+      const args = request.params.arguments as Record<string, any>;
+      const toolName = request.params.name;
 
-          if (!response.success) {
-            return {
-              content: [{ type: "text", text: `Error: ${response.error}` }],
-            };
-          }
+      // Helper to execute RCON and return formatted response
+      const execRCON = async (command: string) => {
+        const response = await this.rcon.sendCommand(command);
+        return {
+          content: [{
+            type: "text" as const,
+            text: response.success ? (response.data || "OK") : `Error: ${response.error}`
+          }]
+        };
+      };
 
-          try {
-            const messages = JSON.parse(response.data || "[]");
-            return {
-              content: [
-                {
-                  type: "text",
-                  text:
-                    messages.length > 0
-                      ? JSON.stringify(messages, null, 2)
-                      : "No new messages",
-                },
-              ],
-            };
-          } catch (e) {
-            return {
-              content: [{ type: "text", text: `Parse error: ${e}` }],
-            };
-          }
-        }
+      // Check if it's a regular RCON tool
+      if (TOOLS[toolName]) {
+        const cmd = buildRCONCommand(toolName, args);
+        return execRCON(cmd);
+      }
 
-        case "send_companion_message": {
-          const parsed = SendMessageSchema.safeParse(request.params.arguments);
+      // Check if it's a skill (background process)
+      if (SKILLS[toolName]) {
+        const skill = SKILLS[toolName];
+        const companionId = args.companionId as number;
 
-          if (!parsed.success) {
-            return {
-              content: [{ type: "text", text: `Invalid arguments: ${parsed.error}` }],
-            };
-          }
-
-          const response = await this.rcon.sendCommand(
-            `/fac_chat_say 0 ${parsed.data.message}`
-          );
-
+        // Check if companion already has a running skill
+        const existing = runningSkills.get(companionId);
+        if (existing) {
           return {
-            content: [
-              {
-                type: "text",
-                text: response.success
-                  ? "Message sent"
-                  : `Error: ${response.error}`,
-              },
-            ],
+            content: [{
+              type: "text" as const,
+              text: `Companion ${companionId} already running ${existing.skillName} (pid ${existing.pid}). Stop it first with skill_stop.`
+            }]
           };
         }
 
-        default:
-          throw new Error(`Unknown tool: ${request.params.name}`);
+        // Build args array from params
+        const scriptArgs = Object.entries(skill.params).map(([name, config]) => {
+          const value = args[name] ?? config.default ?? "";
+          return String(value);
+        });
+
+        const proc = spawn("bun", ["run", `src/${skill.script}`, ...scriptArgs], {
+          cwd: process.cwd(),
+          detached: true,
+          stdio: "ignore"
+        });
+
+        // Track the running skill
+        runningSkills.set(companionId, {
+          pid: proc.pid!,
+          skillName: toolName,
+          startTime: Date.now()
+        });
+
+        // Clean up when process exits
+        proc.on("exit", () => {
+          runningSkills.delete(companionId);
+        });
+
+        proc.unref();
+
+        return {
+          content: [{
+            type: "text" as const,
+            text: `Started ${toolName} for companion ${companionId} (pid ${proc.pid})`
+          }]
+        };
       }
+
+      // companion_status - get companion position + running skill
+      if (toolName === "companion_status") {
+        const companionId = args.companionId as number;
+
+        // Get position from Lua
+        const posResponse = await this.rcon.sendCommand(`/fac_companion_position ${companionId}`);
+        let position = null;
+        try {
+          position = JSON.parse(posResponse.data || "{}");
+        } catch {}
+
+        // Get skill status from TS tracking
+        const skill = runningSkills.get(companionId);
+        const skillInfo = skill ? {
+          running: true,
+          skillName: skill.skillName,
+          pid: skill.pid,
+          elapsedSeconds: Math.floor((Date.now() - skill.startTime) / 1000)
+        } : { running: false };
+
+        return {
+          content: [{
+            type: "text" as const,
+            text: JSON.stringify({ ...position, skill: skillInfo })
+          }]
+        };
+      }
+
+      // companion_stop - kill a running skill
+      if (toolName === "companion_stop") {
+        const companionId = args.companionId as number;
+        const skill = runningSkills.get(companionId);
+
+        if (!skill) {
+          return {
+            content: [{ type: "text" as const, text: `No skill running for companion ${companionId}` }]
+          };
+        }
+
+        try {
+          process.kill(skill.pid);
+          runningSkills.delete(companionId);
+          return {
+            content: [{
+              type: "text" as const,
+              text: `Stopped ${skill.skillName} for companion ${companionId} (pid ${skill.pid})`
+            }]
+          };
+        } catch (e) {
+          runningSkills.delete(companionId);
+          return {
+            content: [{ type: "text" as const, text: `Process already dead, cleaned up tracking` }]
+          };
+        }
+      }
+
+      throw new Error(`Unknown tool: ${toolName}`);
     });
   }
 

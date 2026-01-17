@@ -1,6 +1,9 @@
--- AI Companion v0.9.0 - Factorio 2.x
+-- AI Companion - Factorio 2.x
 local u = require("commands.init")
 local queues = require("commands.queues")
+
+-- Get version dynamically from mod info
+local MOD_VERSION = script.active_mods["ai-companion"] or "unknown"
 
 local function init_storage()
   storage.companion_messages = storage.companion_messages or {}
@@ -9,6 +12,7 @@ local function init_storage()
   storage.walking_queues = storage.walking_queues or {}
   storage.context_clear_requests = storage.context_clear_requests or {}
   storage.errors = storage.errors or {}
+  storage.companion_markers = storage.companion_markers or {}
   queues.init()
 end
 
@@ -27,12 +31,12 @@ end
 
 script.on_init(function()
   init_storage()
-  game.print("[AI Companion] v0.9.0 ready. /fac for help", u.print_color(u.COLORS.system))
+  game.print("[AI Companion] v" .. MOD_VERSION .. " ready. /fac for help", u.print_color(u.COLORS.system))
 end)
 
 script.on_configuration_changed(function()
   init_storage()
-  game.print("[AI Companion] Updated to v0.9.0", u.print_color(u.COLORS.system))
+  game.print("[AI Companion] Updated to v" .. MOD_VERSION, u.print_color(u.COLORS.system))
 end)
 
 local subcommands = {}
@@ -61,6 +65,11 @@ subcommands.kill = function(player, args)
     local c = storage.companions[cid]
     if c then
       if c.label and c.label.valid then c.label.destroy() end
+      -- Remove map marker
+      if storage.companion_markers and storage.companion_markers[cid] then
+        if storage.companion_markers[cid].valid then storage.companion_markers[cid].destroy() end
+        storage.companion_markers[cid] = nil
+      end
       if c.entity and c.entity.valid then c.entity.destroy(); killed = killed + 1 end
       storage.companions[cid] = nil
     end
@@ -131,8 +140,39 @@ require("commands.world")
 require("commands.combat")
 require("commands.help")
 
+-- Update companion map markers
+local function update_companion_markers()
+  if not storage.companion_markers then storage.companion_markers = {} end
+  for cid, c in pairs(storage.companions) do
+    if c.entity and c.entity.valid then
+      local marker = storage.companion_markers[cid]
+      local display = u.get_companion_display(cid)
+      -- Create marker if doesn't exist
+      if not marker or not marker.valid then
+        local force = c.entity.force
+        local surf = c.entity.surface
+        marker = force.add_chart_tag(surf, {
+          position = c.entity.position,
+          text = display
+        })
+        storage.companion_markers[cid] = marker
+      else
+        -- Update marker position
+        marker.position = c.entity.position
+      end
+    else
+      -- Companion died/invalid, remove marker
+      local marker = storage.companion_markers[cid]
+      if marker and marker.valid then marker.destroy() end
+      storage.companion_markers[cid] = nil
+    end
+  end
+end
+
 script.on_nth_tick(5, function(ev)
   if ev.tick % 1800 == 0 then cleanup_messages() end
+  -- Update map markers every 30 ticks (0.5 sec)
+  if ev.tick % 30 == 0 then update_companion_markers() end
   -- Process all tick-based queues (realistic actions)
   queues.tick_harvest_queues()
   queues.tick_craft_queues()

@@ -1,6 +1,26 @@
 -- AI Companion v0.7.0 - Companion commands
 local u = require("commands.init")
 
+commands.add_command("fac_companion_list", nil, function(cmd)
+  local ok, err = pcall(function()
+    local list = {}
+    for id, c in pairs(storage.companions) do
+      if c.entity and c.entity.valid then
+        local pos = c.entity.position
+        list[#list + 1] = {
+          id = id,
+          position = {x = math.floor(pos.x * 10) / 10, y = math.floor(pos.y * 10) / 10},
+          health = math.floor(c.entity.health / c.entity.prototype.max_health * 100),
+          name = c.name
+        }
+      end
+    end
+    table.sort(list, function(a, b) return a.id < b.id end)
+    u.json_response({companions = list, count = #list})
+  end)
+  if not ok then u.error_response(err) end
+end)
+
 commands.add_command("fac_companion_spawn", nil, function(cmd)
   local ok, err = pcall(function()
     local param = cmd.parameter or ""
@@ -40,6 +60,11 @@ commands.add_command("fac_companion_disappear", nil, function(cmd)
       end
     end
     if c.label and c.label.valid then c.label.destroy() end
+    -- Remove map marker
+    if storage.companion_markers and storage.companion_markers[id] then
+      if storage.companion_markers[id].valid then storage.companion_markers[id].destroy() end
+      storage.companion_markers[id] = nil
+    end
     c.entity.destroy()
     storage.context_clear_requests[id] = game.tick
     storage.companions[id] = nil
