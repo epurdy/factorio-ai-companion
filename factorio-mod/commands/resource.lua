@@ -73,10 +73,6 @@ commands.add_command("fac_resource_mine_stop", nil, function(cmd)
   end)
 end)
 
--- NOTE: mine_real commands removed in v0.11.0
--- The hybrid system in queues.lua now provides native mining automatically
--- Use /fac_resource_mine instead - it uses mining_state with auto-restart
-
 commands.add_command("fac_resource_nearest", nil, function(cmd)
   u.safe_command(function()
     local args = u.parse_args("^(%S+)%s+(%S+)$", cmd.parameter)
