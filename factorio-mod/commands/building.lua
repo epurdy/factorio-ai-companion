@@ -48,7 +48,7 @@ commands.add_command("fac_building_remove", nil, function(cmd)
     if not id then u.error_response("Companion not found"); return end
     local x, y = tonumber(args[2]), tonumber(args[3])
     if not x or not y then u.error_response("Invalid coordinates"); return end
-    local es = c.entity.surface.find_entities_filtered{position = {x=x, y=y}, radius = 1, force = c.entity.force}
+    local es = c.entity.surface.find_entities_filtered{position = {x=x, y=y}, radius = 0.5, force = c.entity.force}
     -- Filter out the companion itself
     local t
     for _, e in ipairs(es) do if e.valid and e ~= c.entity then t = e; break end end
@@ -75,7 +75,7 @@ commands.add_command("fac_building_rotate", nil, function(cmd)
     if not id then u.error_response("Companion not found"); return end
     local x, y = tonumber(args[2]), tonumber(args[3])
     if not x or not y then u.error_response("Invalid coordinates"); return end
-    local es = c.entity.surface.find_entities_filtered{position = {x=x, y=y}, radius = 1, force = c.entity.force}
+    local es = c.entity.surface.find_entities_filtered{position = {x=x, y=y}, radius = 0.5, force = c.entity.force}
     local t
     for _, e in ipairs(es) do if e.valid and e ~= c.entity and e.rotatable then t = e; break end end
     if not t then u.json_response({id = id, error = "No rotatable entity"}); return end
