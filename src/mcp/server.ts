@@ -100,6 +100,7 @@ export class FactorioMCPServer {
         }
 
         const cmd = buildRCONCommand(toolName, args);
+        console.error(`[DEBUG] Tool: ${toolName}, Args: ${JSON.stringify(args)}, Cmd: ${cmd}`);
         return execRCON(cmd);
       }
 

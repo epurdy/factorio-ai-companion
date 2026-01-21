@@ -13,13 +13,14 @@ M.COMPANION_COLORS = {
   {r=1, g=0.4, b=0.6}, {r=0.6, g=0.8, b=1}, {r=1, g=0.8, b=0.4}, {r=0.7, g=1, b=0.5}
 }
 
--- Factorio 2.x direction values: 0=N, 2=E, 4=S, 6=W (raw numbers, not defines.direction)
--- defines.direction.east etc seem to double values, so use raw numbers
+-- Factorio 2.x uses pickup direction, MCP uses drop direction
+-- Factorio values are 0,4,8,12 (multiples of 4), MCP uses 0,2,4,6
+-- Mapping is simply x -> 2*x
 M.dir_map = {
-  [0] = 0,  -- north
-  [2] = 2,  -- east
-  [4] = 4,  -- south
-  [6] = 6   -- west
+  [0] = 0,   -- north (drop N = pick from S)
+  [2] = 4,   -- east (drop E = pick from W)
+  [4] = 8,   -- south (drop S = pick from N)
+  [6] = 12   -- west (drop W = pick from E)
 }
 
 function M.print_color(c) return {color = c} end

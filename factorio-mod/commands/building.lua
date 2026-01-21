@@ -8,7 +8,7 @@ commands.add_command("fac_building_can_place", nil, function(cmd)
     local id, c = u.find_companion(args[1])
     if not id then u.error_response("Companion not found"); return end
     local name, x, y = args[2], tonumber(args[3]), tonumber(args[4])
-    local dir = u.dir_map[tonumber(args[5]) or 0] or defines.direction.north
+    local dir = u.dir_map[tonumber(args[5]) or 0] or 0
     if not x or not y then u.error_response("Invalid coordinates"); return end
     local dist = u.distance(c.entity.position, {x=x, y=y})
     if dist > (c.entity.reach_distance or 10) then u.json_response({id = id, can_place = false, reason = "Too far"}); return end
@@ -25,7 +25,7 @@ commands.add_command("fac_building_place", nil, function(cmd)
     local id, c = u.find_companion(args[1])
     if not id then u.error_response("Companion not found"); return end
     local name, x, y = args[2], tonumber(args[3]), tonumber(args[4])
-    local dir = u.dir_map[tonumber(args[5]) or 0] or defines.direction.north
+    local dir = u.dir_map[tonumber(args[5]) or 0] or 0
     if not x or not y then u.error_response("Invalid coordinates"); return end
     local dist = u.distance(c.entity.position, {x=x, y=y})
     if dist > (c.entity.reach_distance or 10) then u.json_response({id = id, error = "Too far"}); return end
@@ -79,10 +79,11 @@ commands.add_command("fac_building_rotate", nil, function(cmd)
     local t
     for _, e in ipairs(es) do if e.valid and e ~= c.entity and e.rotatable then t = e; break end end
     if not t then u.json_response({id = id, error = "No rotatable entity"}); return end
-    -- Rotate clockwise: N(0)->E(2)->S(4)->W(6)->N(0)
-    local next_dir = (t.direction + 2) % 8
+    -- Factorio 2.x: directions are 0,4,8,12 (multiples of 4), rotate by adding 4 mod 16
+    local next_dir = (t.direction + 4) % 16
     t.direction = next_dir
-    u.json_response({id = id, rotated = t.name, direction = next_dir})
+    -- Return MCP-style direction (0,2,4,6) by dividing by 2
+    u.json_response({id = id, rotated = t.name, direction = next_dir / 2})
   end)
 end)
 
