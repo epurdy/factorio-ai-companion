@@ -2,6 +2,18 @@
 local u = require("commands.init")
 local queues = require("commands.queues")
 
+-- Helper: check if companion can craft recipe (characters don't have can_craft method)
+local function check_can_craft(c, recipe, count)
+  local inv = c.entity.get_inventory(defines.inventory.character_main)
+  for _, ing in ipairs(recipe.ingredients) do
+    if ing.type == "item" then
+      local have = inv.get_item_count(ing.name)
+      if have < ing.amount * count then return false end
+    end
+  end
+  return true
+end
+
 commands.add_command("fac_item_craft", nil, function(cmd)
   u.safe_command(function()
     local args = u.parse_args("^(%S+)%s+(%S+)%s*(%d*)$", cmd.parameter)
@@ -11,12 +23,14 @@ commands.add_command("fac_item_craft", nil, function(cmd)
     local recipe = c.entity.force.recipes[item]
     if not recipe then u.json_response({id = id, error = "Recipe not found"}); return end
     if not recipe.enabled then u.json_response({id = id, error = "Not unlocked"}); return end
-    if not c.entity.can_craft(recipe, count) then
+    if not check_can_craft(c, recipe, count) then
       local missing = {}
       local inv = c.entity.get_inventory(defines.inventory.character_main)
       for _, ing in ipairs(recipe.ingredients) do
-        local have, need = inv.get_item_count(ing.name), ing.amount * count
-        if have < need then missing[#missing + 1] = {name = ing.name, have = have, need = need} end
+        if ing.type == "item" then
+          local have, need = inv.get_item_count(ing.name), ing.amount * count
+          if have < need then missing[#missing + 1] = {name = ing.name, have = have, need = need} end
+        end
       end
       u.json_response({id = id, error = "Missing", missing = missing}); return
     end
@@ -56,13 +70,14 @@ commands.add_command("fac_item_recipes", nil, function(cmd)
     local result = {}
     for name, recipe in pairs(c.entity.force.recipes) do
       if recipe.enabled then
+        local craftable = check_can_craft(c, recipe, 1)
         local inc = true
-        if filter == "active" then inc = c.entity.can_craft(recipe, 1)
+        if filter == "active" then inc = craftable
         elseif filter and filter ~= "" then inc = name:find(filter, 1, true) end
         if inc then
           local ings = {}
           for _, ing in ipairs(recipe.ingredients) do ings[#ings + 1] = {name = ing.name, amount = ing.amount} end
-          result[#result + 1] = {name = name, ingredients = ings, can_craft = c.entity.can_craft(recipe, 1)}
+          result[#result + 1] = {name = name, ingredients = ings, can_craft = craftable}
         end
       end
     end
