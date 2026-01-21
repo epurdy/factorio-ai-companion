@@ -139,6 +139,7 @@ require("commands.resource")
 require("commands.world")
 require("commands.combat")
 require("commands.help")
+require("commands.blueprint")
 
 -- Update companion map markers
 local function update_companion_markers()
