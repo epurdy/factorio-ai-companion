@@ -43,17 +43,26 @@ end)
 
 commands.add_command("fac_building_remove", nil, function(cmd)
   u.safe_command(function()
-    local args = u.parse_args("^(%S+)%s+(%S+)%s+([%d.-]+)%s+([%d.-]+)$", cmd.parameter)
+    local args = u.parse_args("^(%S+)%s+([%d.-]+)%s+([%d.-]+)$", cmd.parameter)
     local id, c = u.find_companion(args[1])
     if not id then u.error_response("Companion not found"); return end
-    local name, x, y = args[2], tonumber(args[3]), tonumber(args[4])
+    local x, y = tonumber(args[2]), tonumber(args[3])
     if not x or not y then u.error_response("Invalid coordinates"); return end
-    local es = c.entity.surface.find_entities_filtered{name = name, position = {x=x, y=y}, radius = 1, force = c.entity.force}
-    if #es == 0 then u.json_response({id = id, error = "Not found"}); return end
-    local t = es[1]
+    local es = c.entity.surface.find_entities_filtered{position = {x=x, y=y}, radius = 1, force = c.entity.force}
+    -- Filter out the companion itself
+    local t
+    for _, e in ipairs(es) do if e.valid and e ~= c.entity then t = e; break end end
+    if not t then u.json_response({id = id, error = "Not found"}); return end
     if u.distance(c.entity.position, t.position) > 10 then u.json_response({id = id, error = "Too far"}); return end
+    local name = t.name
     if t.can_be_destroyed() then
-      c.entity.insert{name = name, count = 1}; t.destroy{raise_destroy = false}
+      local products = t.prototype.mineable_properties
+      if products and products.products then
+        for _, p in ipairs(products.products) do
+          if p.type == "item" then c.entity.insert{name = p.name, count = p.amount or 1} end
+        end
+      end
+      t.destroy{raise_destroy = false}
       u.json_response({id = id, removed = true, entity = name})
     else u.json_response({id = id, error = "Cannot remove"}) end
   end)
@@ -61,17 +70,19 @@ end)
 
 commands.add_command("fac_building_rotate", nil, function(cmd)
   u.safe_command(function()
-    local args = u.parse_args("^(%S+)%s+([%d.-]+)%s+([%d.-]+)%s+(%d)$", cmd.parameter)
+    local args = u.parse_args("^(%S+)%s+([%d.-]+)%s+([%d.-]+)$", cmd.parameter)
     local id, c = u.find_companion(args[1])
     if not id then u.error_response("Companion not found"); return end
-    local x, y, dir = tonumber(args[2]), tonumber(args[3]), tonumber(args[4])
+    local x, y = tonumber(args[2]), tonumber(args[3])
     if not x or not y then u.error_response("Invalid coordinates"); return end
     local es = c.entity.surface.find_entities_filtered{position = {x=x, y=y}, radius = 1, force = c.entity.force}
     local t
     for _, e in ipairs(es) do if e.valid and e ~= c.entity and e.rotatable then t = e; break end end
     if not t then u.json_response({id = id, error = "No rotatable entity"}); return end
-    t.direction = u.dir_map[dir] or defines.direction.north
-    u.json_response({id = id, rotated = t.name, direction = dir})
+    -- Rotate clockwise: N(0)->E(2)->S(4)->W(6)->N(0)
+    local next_dir = (t.direction + 2) % 8
+    t.direction = next_dir
+    u.json_response({id = id, rotated = t.name, direction = next_dir})
   end)
 end)
 

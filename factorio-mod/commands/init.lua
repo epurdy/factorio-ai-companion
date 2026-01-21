@@ -13,9 +13,12 @@ M.COMPANION_COLORS = {
   {r=1, g=0.4, b=0.6}, {r=0.6, g=0.8, b=1}, {r=1, g=0.8, b=0.4}, {r=0.7, g=1, b=0.5}
 }
 
+-- Factorio 2.x direction values: 0=N, 2=E, 4=S, 6=W (multiples of 2)
 M.dir_map = {
-  [0] = defines.direction.north, [1] = defines.direction.east,
-  [2] = defines.direction.south, [3] = defines.direction.west
+  [0] = defines.direction.north,
+  [2] = defines.direction.east,
+  [4] = defines.direction.south,
+  [6] = defines.direction.west
 }
 
 function M.print_color(c) return {color = c} end
