@@ -248,9 +248,10 @@ export const TOOLS: Record<string, {
   },
   building_info: {
     desc: "Get building info at coordinates",
-    rcon: "/fac_building_info {companionId} {x} {y}",
+    rcon: "/fac_building_info {companionId} {entityName} {x} {y}",
     params: {
       companionId: { type: "number", required: true },
+      entityName: { type: "string", required: true, desc: "Entity name to look for (e.g. 'stone-furnace')" },
       x: { type: "number", required: true },
       y: { type: "number", required: true }
     }
@@ -266,43 +267,43 @@ export const TOOLS: Record<string, {
   },
   building_recipe: {
     desc: "Get/set recipe for assembling machine",
-    rcon: "/fac_building_recipe {companionId} {x} {y} {recipe}",
+    rcon: "/fac_building_recipe {companionId} {recipe} {x} {y}",
     params: {
       companionId: { type: "number", required: true },
-      x: { type: "number", required: true },
-      y: { type: "number", required: true },
-      recipe: { type: "string", default: "" }
-    }
-  },
-  building_fuel: {
-    desc: "Add fuel to entity (burner, furnace, etc)",
-    rcon: "/fac_building_fuel {companionId} {x} {y} {fuelName} {count}",
-    params: {
-      companionId: { type: "number", required: true },
-      x: { type: "number", required: true },
-      y: { type: "number", required: true },
-      fuelName: { type: "string", required: true },
-      count: { type: "number", required: true }
-    }
-  },
-  building_empty: {
-    desc: "Empty contents from entity",
-    rcon: "/fac_building_empty {companionId} {x} {y}",
-    params: {
-      companionId: { type: "number", required: true },
+      recipe: { type: "string", required: true, desc: "Recipe name to set" },
       x: { type: "number", required: true },
       y: { type: "number", required: true }
     }
   },
-  building_fill: {
-    desc: "Fill entity with items",
-    rcon: "/fac_building_fill {companionId} {x} {y} {itemName} {count}",
+  building_fuel: {
+    desc: "Add fuel to entity (burner, furnace, etc) - fuels nearest burner within 3 tiles of companion",
+    rcon: "/fac_building_fuel {companionId} {fuelName} {count}",
     params: {
       companionId: { type: "number", required: true },
-      x: { type: "number", required: true },
-      y: { type: "number", required: true },
-      itemName: { type: "string", required: true },
-      count: { type: "number", required: true }
+      fuelName: { type: "string", required: true, desc: "Fuel item name (e.g. 'coal', 'wood')" },
+      count: { type: "number", default: 5, desc: "Amount to insert" }
+    }
+  },
+  building_empty: {
+    desc: "Empty specific item from nearby entities into companion inventory",
+    rcon: "/fac_building_empty {companionId} {itemName} {count} {x} {y}",
+    params: {
+      companionId: { type: "number", required: true },
+      itemName: { type: "string", required: true, desc: "Item to extract (e.g. 'iron-plate')" },
+      count: { type: "number", default: 10, desc: "Max amount to extract" },
+      x: { type: "number", default: 0, desc: "Position x (0 = use companion position)" },
+      y: { type: "number", default: 0, desc: "Position y (0 = use companion position)" }
+    }
+  },
+  building_fill: {
+    desc: "Fill nearby entity with items from companion inventory",
+    rcon: "/fac_building_fill {companionId} {itemName} {count} {x} {y}",
+    params: {
+      companionId: { type: "number", required: true },
+      itemName: { type: "string", required: true, desc: "Item to insert" },
+      count: { type: "number", default: 10, desc: "Amount to insert" },
+      x: { type: "number", default: 0, desc: "Position x (0 = use companion position)" },
+      y: { type: "number", default: 0, desc: "Position y (0 = use companion position)" }
     }
   },
 
@@ -410,6 +411,38 @@ export const TOOLS: Record<string, {
     rcon: "/fac_help {category}",
     params: {
       category: { type: "string", desc: "Optional: category to filter (action, building, etc)", default: "" }
+    }
+  },
+
+  // Blueprint
+  blueprint_import: {
+    desc: "Import a blueprint string and place it at coordinates (creates ghosts)",
+    rcon: "/fac_blueprint_import {companionId} {x} {y} {direction} {blueprintString}",
+    params: {
+      companionId: { type: "number", required: true },
+      x: { type: "number", required: true, desc: "Center X position for placement" },
+      y: { type: "number", required: true, desc: "Center Y position for placement" },
+      direction: { type: "number", default: 0, desc: "Rotation: 0=N, 2=E, 4=S, 6=W" },
+      blueprintString: { type: "string", required: true, desc: "Factorio blueprint string (starts with 0)" }
+    }
+  },
+  blueprint_export: {
+    desc: "Export an area to a blueprint string",
+    rcon: "/fac_blueprint_export {companionId} {x1} {y1} {x2} {y2}",
+    params: {
+      companionId: { type: "number", required: true },
+      x1: { type: "number", required: true, desc: "Top-left X" },
+      y1: { type: "number", required: true, desc: "Top-left Y" },
+      x2: { type: "number", required: true, desc: "Bottom-right X" },
+      y2: { type: "number", required: true, desc: "Bottom-right Y" }
+    }
+  },
+  blueprint_info: {
+    desc: "Get info about a blueprint string without placing it",
+    rcon: "/fac_blueprint_info {companionId} {blueprintString}",
+    params: {
+      companionId: { type: "number", required: true },
+      blueprintString: { type: "string", required: true, desc: "Factorio blueprint string to analyze" }
     }
   },
 };
